@@ -1,16 +1,25 @@
 // Address region
 //      Register name           |       Adress
 // -----------------------------|----------------
-// DBI STATUS REG               |   32'h3000_0000
-// START COLUMN REG             |   32'h3000_0004
-// END COLUMN REG               |   32'h3000_0008
-// START ROW REG                |   32'h3000_000C
-// END ROW REG                  |   32'h3000_000F
+// DBI TX STATUS REG            |   32'h3000_0000   -> bit0: DBI TX start \ bit 1-7: RESERVED
+// DBI ADDR SOFT RST REG        |   32'h3000_0001
+// DBI ADDR DISP ON REG         |   32'h3000_0002
+// DBI ADDR SET COL REG         |   32'h3000_0003
+// DBI ADDR SET ROW REG         |   32'h3000_0004
+// DBI ADDR SET PIXEL REG       |   32'h3000_0005
+// DBI CMD START COLUMN (H) REG |   32'h3000_0006
+// DBI CMD START COLUMN (L) REG |   32'h3000_0007
+// DBI CMD END COLUMN (H) REG   |   32'h3000_0008
+// DBI CMD END COLUMN (L) REG   |   32'h3000_0009
+// DBI CMD START ROW (H) REG    |   32'h3000_000A
+// DBI CMD START ROW (L) REG    |   32'h3000_000B
+// DBI CMD END ROW (H) REG      |   32'h3000_000C
+// DBI CMD END ROW (L) REG      |   32'h3000_000D
 module axi4_config_reg
 #(
     // AXI4 Interface
     parameter BASE_ADDR         = 32'h3000_0000,    // Memory mapping - BASE
-    parameter CONF_OFFSET       = 32'h04,           // Memory mapping - OFFSET
+    parameter CONF_OFFSET       = 32'h01,           // Memory mapping - OFFSET ---> Address (byte-access) = (base + offset*n)
     parameter DATA_W            = 8,
     parameter ADDR_W            = 32,
     parameter MST_ID_W          = 5,
@@ -19,7 +28,7 @@ module axi4_config_reg
     parameter TRANS_RESP_W      = 2,
     // IP Configuration
     parameter CONF_ADDR_W       = 4,
-    parameter CONF_DATA_W       = 8
+    parameter CONF_DATA_W       = CONF_OFFSET*8     // Byte-access
 )
 (   
     // Input declaration
@@ -58,19 +67,23 @@ module axi4_config_reg
     output  [TRANS_RESP_W-1:0]  m_rresp_o,
     output                      m_rvalid_o,
     // -- -- Configuration 
+    output                      dbi_tx_start_o,
     output  [CONF_DATA_W-1:0]   addr_soft_rst_o,
     output  [CONF_DATA_W-1:0]   addr_disp_on_o,
     output  [CONF_DATA_W-1:0]   addr_col_o,
     output  [CONF_DATA_W-1:0]   addr_row_o,
     output  [CONF_DATA_W-1:0]   addr_mem_wr_o,
-    output  [CONF_DATA_W-1:0]   status_o,
-    output  [CONF_DATA_W-1:0]   cmd_s_col_o,
-    output  [CONF_DATA_W-1:0]   cmd_e_col_o,
-    output  [CONF_DATA_W-1:0]   cmd_s_row_o,
-    output  [CONF_DATA_W-1:0]   cmd_e_row_o
+    output  [CONF_DATA_W-1:0]   cmd_s_col_h_o,
+    output  [CONF_DATA_W-1:0]   cmd_s_col_l_o,
+    output  [CONF_DATA_W-1:0]   cmd_e_col_h_o,
+    output  [CONF_DATA_W-1:0]   cmd_e_col_l_o,
+    output  [CONF_DATA_W-1:0]   cmd_s_row_h_o,
+    output  [CONF_DATA_W-1:0]   cmd_s_row_l_o,
+    output  [CONF_DATA_W-1:0]   cmd_e_row_h_o,
+    output  [CONF_DATA_W-1:0]   cmd_e_row_l_o
 );
     // Local parameters 
-    localparam CONF_ADDR_NUM    = CONF_ADDR_W<<1;
+    localparam CONF_ADDR_NUM    = 1<<CONF_ADDR_W;
     localparam CONF_OFFSET_W    = $clog2(CONF_OFFSET);
     localparam AW_INFO_W        = MST_ID_W + ADDR_W;
     localparam W_INFO_W         = DATA_W;
@@ -190,27 +203,20 @@ module axi4_config_reg
     );
     
     // Combination logic
-    
-    output  [CONF_DATA_W-1:0]   addr_soft_rst_o,
-    output  [CONF_DATA_W-1:0]   addr_disp_on_o,
-    output  [CONF_DATA_W-1:0]   addr_col_o,
-    output  [CONF_DATA_W-1:0]   addr_row_o,
-    output  [CONF_DATA_W-1:0]   addr_mem_wr_o,
-    output  [CONF_DATA_W-1:0]   status_o,
-    output  [CONF_DATA_W-1:0]   cmd_s_col_o,
-    output  [CONF_DATA_W-1:0]   cmd_e_col_o,
-    output  [CONF_DATA_W-1:0]   cmd_s_row_o,
-    output  [CONF_DATA_W-1:0]   cmd_e_row_o
-    assign addr_soft_rst_o  = ip_config_reg[8'h00];
-    assign addr_disp_on_o   = ip_config_reg[8'h01];
-    assign addr_col_o       = ip_config_reg[8'h02];
-    assign addr_row_o       = ip_config_reg[8'h03];
-    assign addr_mem_wr_o    = ip_config_reg[8'h04];
-    assign status_o         = ip_config_reg[8'h05];
-    assign cmd_s_col_o      = ip_config_reg[8'h06];
-    assign cmd_e_col_o      = ip_config_reg[8'h07];
-    assign cmd_s_row_o      = ip_config_reg[8'h08];
-    assign cmd_e_row_o      = ip_config_reg[8'h09];
+    assign dbi_tx_start_o   = ip_config_reg[8'h00][0];
+    assign addr_soft_rst_o  = ip_config_reg[8'h01];
+    assign addr_disp_on_o   = ip_config_reg[8'h02];
+    assign addr_col_o       = ip_config_reg[8'h03];
+    assign addr_row_o       = ip_config_reg[8'h04];
+    assign addr_mem_wr_o    = ip_config_reg[8'h05];
+    assign cmd_s_col_h_o    = ip_config_reg[8'h06];
+    assign cmd_s_col_l_o    = ip_config_reg[8'h07];
+    assign cmd_e_col_h_o    = ip_config_reg[8'h08];
+    assign cmd_e_col_l_o    = ip_config_reg[8'h09];
+    assign cmd_s_row_h_o    = ip_config_reg[8'h0A];
+    assign cmd_s_row_l_o    = ip_config_reg[8'h0B];
+    assign cmd_e_row_h_o    = ip_config_reg[8'h0C];
+    assign cmd_e_row_l_o    = ip_config_reg[8'h0D];
     assign {m_rresp_o, m_rdata_o} = fwd_r_info;
     generate 
     for(conf_idx = 0; conf_idx < CONF_ADDR_NUM; conf_idx = conf_idx + 1) begin
@@ -243,5 +249,5 @@ module axi4_config_reg
     end
     end
     endgenerate
-    
+
 endmodule

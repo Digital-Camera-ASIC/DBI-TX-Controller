@@ -1,18 +1,28 @@
+/* 
+This IP does not need to use AXI4 (memory mapping) protocol for DMA interface. 
+However, in future versions, this ASIC can have multiple virtual channels for 
+multiple camera sensors, 
+which means this ASIC should support multiple display interfaces.
+*/
 module dbi_tx_controller 
 #(
     // AXI4 Interface
     // -- DMA
-    parameter DMA_DATA_W        = 256,
-    parameter ADDR_W            = 32,
+    parameter DMA_DATA_W            = 256,
+    parameter ADDR_W                = 32,
     // -- Master Configuration BUS 
-    parameter MC_DATA_W         = 8,
+    parameter MC_DATA_W             = 8,
     // -- Common
-    parameter MST_ID_W          = 5,
-    parameter TRANS_DATA_LEN_W  = 8,
-    parameter TRANS_DATA_SIZE_W = 3,
-    parameter TRANS_RESP_W      = 2,
+    parameter MST_ID_W              = 5,
+    parameter TRANS_DATA_LEN_W      = 8,
+    parameter TRANS_DATA_SIZE_W     = 3,
+    parameter TRANS_RESP_W          = 2,
+    // Memory Mapping
+    parameter IP_DATA_BASE_ADDR     = 32'h2000_0000,
+    parameter IP_CONF_BASE_ADDR     = 32'h3000_0000,
+    parameter IP_CONF_OFFSET_ADDR   = 32'h01,
     // DBI Interface
-    parameter DBI_IF_D_W        = 8
+    parameter DBI_IF_D_W            = 8
     
 ) (
     // Input declaration
@@ -71,13 +81,14 @@ module dbi_tx_controller
     // Internal module
     // -- AXI4 configuration registers file
     axi4_config_reg #(
-
+        .BASE_ADDR(IP_CONF_BASE_ADDR),
+        .CONF_OFFSET(IP_CONF_OFFSET_ADDR)
     ) acr (
 
     );
 
     axi4_fifo #(
-
+        .BASE_ADDR(IP_DATA_BASE_ADDR)
     ) af (
 
     );
