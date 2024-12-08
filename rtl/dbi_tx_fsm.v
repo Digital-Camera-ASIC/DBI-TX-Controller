@@ -107,8 +107,6 @@ module dbi_tx_fsm
             IDLE_ST: begin
                 if(dbi_tx_start_i) begin
                     dbi_tx_st_d     = DBI_RST_ST;
-                    dtp_tx_vld_d    = 1'b1;
-                    dtp_dbi_hrst_d  = 1'b1;
                 end
             end
             DBI_RST_ST: begin
@@ -130,9 +128,10 @@ module dbi_tx_fsm
                 dtp_tx_cmd_typ_d    = addr_col_i;
                 dtp_tx_cmd_dat_d    = set_col_map;
                 dtp_tx_vld_d        = 1'b1;
+                dtp_tx_last_d       = &dbi_tx_cnt_q[1:0];
                 if(dtp_tx_rdy_i) begin   // Handshake
                     dbi_tx_cnt_d    = dbi_tx_cnt_q + 1'b1;
-                    if (&dbi_tx_cnt_q[1:0]) begin   // Handshake with the 4th transfer
+                    if (dtp_tx_last_d) begin   // Handshake with the 4th transfer
                         dbi_tx_st_d = DBI_SET_ROW_ST;
                         dbi_tx_cnt_d= {DBI_TX_CNT_W{1'b0}};
                     end
@@ -142,9 +141,10 @@ module dbi_tx_fsm
                 dtp_tx_cmd_typ_d    = addr_row_i;
                 dtp_tx_cmd_dat_d    = set_row_map;
                 dtp_tx_vld_d        = 1'b1;
+                dtp_tx_last_d       = &dbi_tx_cnt_q[1:0];
                 if(dtp_tx_rdy_i) begin   // Handshake
                     dbi_tx_cnt_d    = dbi_tx_cnt_q + 1'b1;
-                    if (&dbi_tx_cnt_q[1:0]) begin   // Handshake with the 4th transfer
+                    if (dtp_tx_last_d) begin   // Handshake with the 4th transfer
                         dbi_tx_st_d = DBI_DISP_ST;
                         dbi_tx_cnt_d= {DBI_TX_CNT_W{1'b0}};
                     end
@@ -154,6 +154,7 @@ module dbi_tx_fsm
                 dtp_tx_cmd_typ_d    = addr_disp_on_i;
                 dtp_tx_no_dat_d     = 1'b1;
                 dtp_tx_vld_d        = 1'b1;
+                dtp_tx_last_d       = 1'b1;
                 if (dtp_tx_rdy_i) begin
                     dbi_tx_st_d     = DBI_STM_ST;
                 end

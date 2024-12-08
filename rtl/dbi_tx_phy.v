@@ -40,7 +40,7 @@ module dbi_tx_phy
     localparam T_WRH_CYC        = $rtoi(T_WRH_SEC * INTERNAL_CLK);
     localparam T_HRST_CYC       = $rtoi(T_HRST_SEC * INTERNAL_CLK);
     localparam T_TXN_PAU_CYC    = $rtoi(T_TXN_PAU_SEC * INTERNAL_CLK);
-    localparam T_CYC_MAX        = $rtoi(T_HRST_CYC);
+    localparam T_CYC_MAX        = T_HRST_CYC;
     localparam T_CYC_W          = $clog2(T_CYC_MAX);
     // Internal signal
     // -- wire
