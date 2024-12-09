@@ -164,7 +164,7 @@ module axi4_fifo
     assign {fwd_aw_awid, fwd_aw_awaddr} = fwd_aw_info;
 
     // W channel
-    assign wb_wr_vld    = fwd_aw_vld & aw_map_vld;                  // Just buffer VALID mapped transfers    
+    assign wb_wr_vld    = fwd_aw_vld & aw_map_vld & m_wvalid_i;     // Just buffer VALID mapped transfers    
     assign wb_wr_data   = {m_wlast_i, m_wdata_i};
     assign bwd_w_hsk    = m_wvalid_i & m_wready_o;
     assign {wb_rd_wlast, wb_rd_wdata} = wb_rd_data;
