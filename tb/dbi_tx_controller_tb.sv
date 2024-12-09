@@ -163,7 +163,30 @@ module dbi_tx_controller_tb;
             end
         join_none
     end
-
+    initial begin : DMA_AXI4
+        localparam TX_PER_TXN = 2400;
+        int tx_cnt;
+        int byte_cnt;
+        bit [DMA_DATA_W-1:0] dma_wdata;
+        #(`RST_DLY_START + `RST_DUR + 1);
+        fork
+            begin : DMA_AW
+                m_aw_transfer(.m_awid(5'h00), .m_awaddr(32'h2000_0000));
+                aclk_cl;
+                m_awvalid_i <= 1'b0;
+            end
+            begin : DMA_W
+                for (tx_cnt=0; tx_cnt < TX_PER_TXN; tx_cnt++) begin
+                    for (byte_cnt = 0; byte_cnt < (DMA_DATA_W/8); byte_cnt++) begin
+                        dma_wdata[8*(byte_cnt+1)-1-:8] = (byte_cnt%2 == 0) ? '1 : '0;
+                    end
+                    m_w_transfer(.m_wdata(dma_wdata), .m_wlast((tx_cnt==(TX_PER_TXN-1))));
+                end
+                aclk_cl;
+                m_wvalid_i <= 1'b0;
+            end
+        join_none
+    end
 
     /* DeepCode */
     task automatic mc_aw_transfer(
@@ -197,6 +220,31 @@ module dbi_tx_controller_tb;
         // Handshake occur
         wait(mc_arready_o == 1'b1); #0.1;
     endtask
+
+    /* DMA task */
+    task automatic m_aw_transfer(
+        input [MST_ID_W-1:0]    m_awid,
+        input [ADDR_W-1:0]      m_awaddr
+    );
+        aclk_cl;
+        m_awid_i            <= m_awid;
+        m_awaddr_i          <= m_awaddr;
+        m_awvalid_i         <= 1'b1;
+        // Handshake occur
+        wait(m_awready_o == 1'b1); #0.1;
+    endtask
+    task automatic m_w_transfer (
+        input [DMA_DATA_W-1:0]  m_wdata,
+        input                   m_wlast
+    );
+        aclk_cl;
+        m_wdata_i           <= m_wdata;
+        m_wvalid_i          <= 1'b1;
+        m_wlast_i           <= m_wlast;
+        // Handshake occur
+        wait(m_wready_o == 1'b1); #0.1;
+    endtask
+
     task automatic aclk_cl;
         @(posedge clk);
         #0.05; 

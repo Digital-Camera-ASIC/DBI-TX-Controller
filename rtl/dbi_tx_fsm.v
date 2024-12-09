@@ -71,6 +71,7 @@ module dbi_tx_fsm
     wire    [DBI_TX_CNT_W-1:0]  set_col_map;
     wire    [DBI_TX_CNT_W-1:0]  set_row_list    [0:3];
     wire    [DBI_TX_CNT_W-1:0]  set_row_map;
+    reg                         rgb_pxl_rdy;
     // -- reg
     reg     [2:0]               dbi_tx_st_q;
     reg     [RST_STALL_W-1:0]   rst_stall_cnt_q;
@@ -83,6 +84,7 @@ module dbi_tx_fsm
     assign dtp_tx_last_o    = dtp_tx_last_d;
     assign dtp_tx_no_dat_o  = dtp_tx_no_dat_d;
     assign dtp_tx_vld_o     = dtp_tx_vld_d;
+    assign pxl_rdy_o        = rgb_pxl_rdy;
     assign set_col_list[0]  = cmd_s_col_h_i;
     assign set_col_list[1]  = cmd_s_col_l_i;
     assign set_col_list[2]  = cmd_e_col_h_i;
@@ -99,6 +101,7 @@ module dbi_tx_fsm
         dbi_tx_cnt_d        = dbi_tx_cnt_q;
         dtp_tx_cmd_typ_d    = NOP_CMD;
         dtp_tx_cmd_dat_d    = NOP_CMD;
+        rgb_pxl_rdy         = 1'b0;
         dtp_dbi_hrst_d      = 1'b0;
         dtp_tx_last_d       = 1'b0;
         dtp_tx_no_dat_d     = 1'b0;
@@ -163,9 +166,10 @@ module dbi_tx_fsm
                 dtp_tx_cmd_typ_d    = addr_mem_wr_i;
                 dtp_tx_cmd_dat_d    = pxl_d_i;
                 dtp_tx_vld_d        = pxl_vld_i;
+                rgb_pxl_rdy         = dtp_tx_rdy_i;
                 dtp_tx_last_d       = ~|(dbi_tx_cnt_q^(DBI_TX_PER_TXN-1));
                 if(dtp_tx_rdy_i) begin
-                    dbi_tx_cnt_d    = dbi_tx_cnt_q + 1'b1;
+                    dbi_tx_cnt_d    = dbi_tx_cnt_q + (dtp_tx_rdy_i & dtp_tx_vld_o);
                     if(dtp_tx_last_d) begin
                         dbi_tx_cnt_d= {DBI_TX_CNT_W{1'b0}};
                         if(~dbi_tx_start_i) begin

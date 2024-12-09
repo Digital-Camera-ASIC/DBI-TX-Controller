@@ -37,6 +37,7 @@ module axi4_fifo
     // -- -- W channel
     output                      m_wready_o,
     // -- -- B channel
+    output  [MST_ID_W-1:0]      m_bid_o,
     output  [TRANS_RESP_W-1:0]  m_bresp_o,
     output                      m_bvalid_o,
     // -- To DBI TX PHY
@@ -47,7 +48,7 @@ module axi4_fifo
     // Local parameters
     localparam AW_INFO_W    = MST_ID_W + ADDR_W;
     localparam W_INFO_W     = DATA_W + 1;
-    localparam B_INFO_W     = TRANS_RESP_W;
+    localparam B_INFO_W     = MST_ID_W + TRANS_RESP_W;
 
     // Internal signal
     // -- wire
@@ -59,9 +60,12 @@ module axi4_fifo
     wire                    fwd_aw_rdy;
 
     wire [B_INFO_W-1:0]     bwd_b_info;
+    wire [MST_ID_W-1:0]     bwd_b_bid;
+    wire [TRANS_RESP_W-1:0] bwd_b_bresp;
     wire                    bwd_b_vld;
     wire                    bwd_b_rdy;
     wire [B_INFO_W-1:0]     fwd_b_info;
+    wire [MST_ID_W-1:0]     fwd_b_bid;
     wire [TRANS_RESP_W-1:0] fwd_b_bresp;
 
     wire [W_INFO_W-1:0]     wb_wr_data;
@@ -151,6 +155,7 @@ module axi4_fifo
 
     // Combination logic
     assign m_wready_o   = fwd_aw_vld & (wb_wr_rdy | (~aw_map_vld)); // Wrong mapping -> Fake handshaking to skip all W transfers
+    assign m_bid_o      = fwd_b_bid;
     assign m_bresp_o    = fwd_b_bresp;
 
     // AW channel
@@ -165,9 +170,11 @@ module axi4_fifo
     assign {wb_rd_wlast, wb_rd_wdata} = wb_rd_data;
 
     // B channel
-    assign bwd_b_info   = aw_map_vld ? 2'b00 : 2'b11;
+    assign bwd_b_info   = {bwd_b_bid, bwd_b_bresp};
+    assign bwd_b_bid    = fwd_aw_awid;
+    assign bwd_b_bresp  = aw_map_vld ? 2'b00 : 2'b11;
     assign bwd_b_vld    = bwd_w_hsk & m_wlast_i;
-    assign fwd_b_bresp  = fwd_b_info;
+    assign {fwd_b_bid, fwd_b_bresp} = fwd_b_info;
 
     // Common
     assign aw_map_vld   = ~|(fwd_aw_awaddr^(BASE_ADDR));

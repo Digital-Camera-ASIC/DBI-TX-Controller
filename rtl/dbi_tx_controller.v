@@ -176,6 +176,7 @@ module dbi_tx_controller
         .dtp_d_rdy_i        (dtp_d_rdy),
         .m_awready_o        (m_awready_o),
         .m_wready_o         (m_wready_o),
+        .m_bid_o            (m_bid_o),
         .m_bresp_o          (m_bresp_o),
         .m_bvalid_o         (m_bvalid_o),
         .dtp_d_data_o       (dtp_d_data),
