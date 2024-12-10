@@ -7,6 +7,8 @@ module sync_fifo
     // For Concatenating FIFO
     parameter IN_DATA_WIDTH     = DATA_WIDTH,
     parameter OUT_DATA_WIDTH    = DATA_WIDTH,
+    // -- For CONCAT FIFO 
+    parameter CONCAT_ORDER      = "LSB",
     // Do not configure
     parameter ADDR_WIDTH        = $clog2(FIFO_DEPTH)
 )
@@ -278,7 +280,12 @@ else if(FIFO_TYPE == 3) begin : CONCAT_FIFO
     assign rd_hsk       = rd_valid_i & rd_ready_o;
     assign sml_full     = ~|(sml_cnt ^ (CAT_NUM-1));
     for(sml_idx = 0; sml_idx < CAT_NUM; sml_idx = sml_idx + 1) begin
-        assign data_o[IN_DATA_WIDTH*(sml_idx+1)-1-:IN_DATA_WIDTH] = buffer[sml_idx];
+        if(CONCAT_ORDER == "LSB") begin
+            assign data_o[IN_DATA_WIDTH*(sml_idx+1)-1-:IN_DATA_WIDTH] = buffer[sml_idx];
+        end
+        else if(CONCAT_ORDER == "MSB") begin
+            assign data_o[IN_DATA_WIDTH*(sml_idx+1)-1-:IN_DATA_WIDTH] = buffer[CAT_NUM - 1 - sml_idx];
+        end
     end
     
     // Flip-flop

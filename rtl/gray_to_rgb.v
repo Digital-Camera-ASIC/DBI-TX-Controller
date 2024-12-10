@@ -34,7 +34,7 @@ module gray_to_rgb
     reg                         rgb_pxl_lo_flag;
 
     // Combination logic
-    assign rgb_pxl_dat_o    = rgb_pxl_lo_flag ? rgb_pxl_dat_hi : rgb_pxl_dat_lo;
+    assign rgb_pxl_dat_o    = rgb_pxl_lo_flag ? rgb_pxl_dat_lo : rgb_pxl_dat_hi;
     assign rgb_pxl_vld_o    = gray_pxl_vld_i;
     assign gray_pxl_rdy_o   = rgb_pxl_lo_flag & rgb_pxl_rdy_i;
     assign rgb_pxl_hsk      = rgb_pxl_vld_o & rgb_pxl_rdy_i;
