@@ -11,7 +11,7 @@ module axi4_fifo
     parameter BASE_ADDR         = 32'h2000_0000,
     // Module configuration
     parameter DBI_IF_D_W        = 8,
-    parameter W_FIFO_CAPAC      = 8    // x 256bit-width (carefully)
+    parameter W_FIFO_CAPAC      = 2    // x 256bit-width (carefully)
 ) 
 (
     // Input declaration

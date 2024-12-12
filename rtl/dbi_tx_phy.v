@@ -76,12 +76,12 @@ module dbi_tx_phy
     // -- FSM Coding                            (On-going)
     // Combination logic
     assign dbi_d_o      = dbi_d_ctrl_q ? dbi_wr_d_q : {DBI_IF_D_W{1'bz}};
+    assign dbi_dcx_o    = dbi_dcx_q;
+    assign dbi_csx_o    = dbi_csx_q;
+    assign dbi_resx_o   = dbi_resx_q;
+    assign dbi_rdx_o    = dbi_rdx_q;
+    assign dbi_wrx_o    = dbi_wrx_q;
     assign dtf_tx_rdy_o = dtf_tx_rdy;
-    assign dbi_dcx_o    = dbi_dcx_d;
-    assign dbi_csx_o    = dbi_csx_d;
-    assign dbi_resx_o   = dbi_resx_d;
-    assign dbi_rdx_o    = dbi_rdx_d;
-    assign dbi_wrx_o    = dbi_wrx_d;
     assign dtf_hsk      = dtf_tx_vld_i & dtf_tx_rdy_o;
     always @(*) begin
         dbi_phy_st_d        = dbi_phy_st_q;
