@@ -13,7 +13,7 @@ module dbi_tx_fsm
     input   [DBI_IF_D_W-1:0]    dbi_mem_com_i,
     input                       tx_type_rw_i,
     input                       tx_type_hrst_i,
-    input   [1:0]               tx_type_dat_amt_i,
+    input   [2:0]               tx_type_dat_amt_i,
     input                       tx_type_vld_i,
     input   [DBI_IF_D_W-1:0]    tx_com_i,
     input                       tx_com_vld_i,
@@ -141,7 +141,7 @@ module dbi_tx_fsm
                 // // else                     -> tx_type_vld_i & tx_com_vld_i & tx_data_vld_i must be valid (the data is only needed when data_amt != 0)
                 dtp_dbi_hrst    = tx_type_hrst_i;
                 dtp_tx_no_dat   = ~|tx_type_dat_amt_i; // Data amount == 0
-                dtp_tx_last     = (&dbi_tx_cnt_q[1:0]) | tx_type_hrst_i;
+                dtp_tx_last     = (~|dbi_tx_cnt_q) | tx_type_hrst_i | (~|tx_type_dat_amt_i); // Assert when (last data) | (HW-RST trans) | (No data trans)
                 tx_type_rdy     = dtp_tx_rdy_i & dtp_tx_last; // READY is assert when the last data is sent
                 tx_com_rdy      = tx_type_rdy & (~tx_type_hrst_i); // Just assert when the transmission is not a HW-RST tx
                 tx_data_rdy     = dtp_tx_rdy_i & (|tx_type_dat_amt_i) & (~tx_type_hrst_i);  // Just assert when the transmission has data field (data_amt != 0) and is not a HW-RST tx
@@ -156,7 +156,7 @@ module dbi_tx_fsm
                 dtp_tx_cmd_dat  = pxl_d_i;
                 dtp_tx_vld      = pxl_vld_i; 
                 dbi_tx_cnt_d    = dbi_tx_cnt_q - (dtp_tx_rdy_i & dtp_tx_vld_o);
-                dtp_tx_last     = (&dbi_tx_cnt_q);
+                dtp_tx_last     = (~|dbi_tx_cnt_q);
             end
         endcase 
     end

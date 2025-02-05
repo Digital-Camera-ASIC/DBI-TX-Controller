@@ -22,68 +22,72 @@ module dbi_tx_controller
     
 ) (
     // Input declaration
-    input                       clk,
-    input                       rst_n,
+    input                           clk,
+    input                           rst_n,
     // -- AXI4 Master DMA
     // -- -- AW channel
-    input   [MST_ID_W-1:0]      m_awid_i,
-    input   [ADDR_W-1:0]        m_awaddr_i,
-    input                       m_awvalid_i,
+    input   [MST_ID_W-1:0]          m_awid_i,
+    input   [ADDR_W-1:0]            m_awaddr_i,
+    input                           m_awvalid_i,
     // -- -- W channel
-    input   [DMA_DATA_W-1:0]    m_wdata_i,
-    input                       m_wlast_i,
-    input                       m_wvalid_i,
+    input   [DMA_DATA_W-1:0]        m_wdata_i,
+    input                           m_wlast_i,
+    input                           m_wvalid_i,
     // -- -- B channel
-    input                       m_bready_i,
+    input                           m_bready_i,
     // -- AXI4 Master configuration line (master)
     // -- -- AW channel
-    input   [MST_ID_W-1:0]      mc_awid_i,
-    input   [ADDR_W-1:0]        mc_awaddr_i,
-    input                       mc_awvalid_i,
+    input   [MST_ID_W-1:0]          mc_awid_i,
+    input   [ADDR_W-1:0]            mc_awaddr_i,
+    input   [TRANS_DATA_LEN_W-1:0]  mc_awlen_i,
+    input                           mc_awvalid_i,
     // -- -- W channel
-    input   [MC_DATA_W-1:0]     mc_wdata_i,
-    input                       mc_wvalid_i,
+    input   [MC_DATA_W-1:0]         mc_wdata_i,
+    input                           mc_wlast_i,
+    input                           mc_wvalid_i,
     // -- -- B channel
-    input                       mc_bready_i,
+    input                           mc_bready_i,
     // -- -- AR channel
-    input   [MST_ID_W-1:0]      mc_arid_i,
-    input   [ADDR_W-1:0]        mc_araddr_i,
-    input                       mc_arvalid_i,
+    input   [MST_ID_W-1:0]          mc_arid_i,
+    input   [ADDR_W-1:0]            mc_araddr_i,
+    input   [TRANS_DATA_LEN_W-1:0]  mc_arlen_i,
+    input                           mc_arvalid_i,
     // -- -- R channel
-    input                       mc_rready_i,
+    input                           mc_rready_i,
     // Output declaration
     // -- AXI4 DMA (master)
     // -- -- AW channel
-    output                      m_awready_o,
+    output                          m_awready_o,
     // -- -- W channel
-    output                      m_wready_o,
+    output                          m_wready_o,
     // -- -- B channel
-    output  [MST_ID_W-1:0]      m_bid_o,
-    output  [TRANS_RESP_W-1:0]  m_bresp_o,
-    output                      m_bvalid_o,
+    output  [MST_ID_W-1:0]          m_bid_o,
+    output  [TRANS_RESP_W-1:0]      m_bresp_o,
+    output                          m_bvalid_o,
     // -- AXI4 Master configuration line
     // -- -- AW channel
-    output                      mc_awready_o,
+    output                          mc_awready_o,
     // -- -- W channel
-    output                      mc_wready_o,
+    output                          mc_wready_o,
     // -- -- B channel
-    output  [MST_ID_W-1:0]      mc_bid_o,
-    output  [TRANS_RESP_W-1:0]  mc_bresp_o,
-    output                      mc_bvalid_o,
+    output  [MST_ID_W-1:0]          mc_bid_o,
+    output  [TRANS_RESP_W-1:0]      mc_bresp_o,
+    output                          mc_bvalid_o,
     // -- -- AR channel
-    output                      mc_arready_o,
+    output                          mc_arready_o,
     // -- -- R channel
-    output  [MST_ID_W-1:0]      mc_rid_o,
-    output  [MC_DATA_W-1:0]     mc_rdata_o,
-    output  [TRANS_RESP_W-1:0]  mc_rresp_o,
-    output                      mc_rvalid_o,
+    output  [MST_ID_W-1:0]          mc_rid_o,
+    output  [MC_DATA_W-1:0]         mc_rdata_o,
+    output  [TRANS_RESP_W-1:0]      mc_rresp_o,
+    output                          mc_rlast_o,
+    output                          mc_rvalid_o,
     // -- DBI TX interface
-    output                      dbi_dcx_o,
-    output                      dbi_csx_o,
-    output                      dbi_resx_o,
-    output                      dbi_rdx_o,
-    output                      dbi_wrx_o,
-    inout   [DBI_IF_D_W-1:0]    dbi_d_o 
+    output                          dbi_dcx_o,
+    output                          dbi_csx_o,
+    output                          dbi_resx_o,
+    output                          dbi_rdx_o,
+    output                          dbi_wrx_o,
+    inout   [DBI_IF_D_W-1:0]        dbi_d_o 
 );
     // Local parameters 
     localparam DBI_CONF_REG     = 1 + 1;        // DBI_CTRL_ST + DBI_MEM_COM
@@ -98,7 +102,7 @@ module dbi_tx_controller
     wire    [DBI_IF_D_W-1:0]        conf_reg        [0:DBI_CONF_REG-1];
     wire                            tx_type_rw;
     wire                            tx_type_hrst;
-    wire    [1:0]                   tx_type_dat_amt;
+    wire    [2:0]                   tx_type_dat_amt;
     wire                            tx_type_vld;
     wire                            tx_type_rdy;
     wire    [DBI_IF_D_W-1:0]        tx_com;
@@ -137,7 +141,7 @@ module dbi_tx_controller
     // -- BASE: 0x3100_0000 - OFFSET: 0
     assign tx_type_rw           = tx_fifo_dat[8'd00][0];
     assign tx_type_hrst         = tx_fifo_dat[8'd00][1];
-    assign tx_type_dat_amt      = tx_fifo_dat[8'd00][3:2];
+    assign tx_type_dat_amt      = tx_fifo_dat[8'd00][4:2];
     assign tx_type_vld          = tx_fifo_vld[8'd00];
     assign tx_fifo_rdy[8'd00]   = tx_type_rdy;
     // -- BASE: 0x3100_0000 - OFFSET: 1
@@ -170,7 +174,7 @@ endgenerate
         .ST_WR_BASE_ADDR    (IP_CONF_TX_BASE_ADDR),
         .ST_WR_OFFSET       (IP_CONF_OFFSET_ADDR),
         .ST_WR_FIFO_NUM     (DBI_TX_FIFO_NUM),
-        .ST_WR_FIFO_DEPTH   (4),
+        .ST_WR_FIFO_DEPTH   (16),
         .ST_RD_BASE_ADDR    (),
         .ST_RD_OFFSET       (),
         .ST_RD_FIFO_NUM     (),
@@ -268,7 +272,7 @@ endgenerate
         .rgb_pxl_dat_o      (rgb_pxl_dat),
         .rgb_pxl_vld_o      (rgb_pxl_vld)
     );
-    
+
     dbi_tx_fsm #(
         .INTERNAL_CLK       (INTERNAL_CLK),
         .DBI_IF_D_W         (DBI_IF_D_W)
