@@ -1,5 +1,4 @@
-module dbi_tx_phy 
-#(
+module dtc_phy_ctrl #(
     parameter INTERNAL_CLK      = 125000000,
     // DBI Interface
     parameter DBI_IF_D_W        = 8

@@ -8,55 +8,62 @@
 
 module dbi_tx_controller_tb;
     parameter INTERNAL_CLK          = 125000000;
-    parameter DMA_DATA_W            = 256;
-    parameter ADDR_W                = 32;
-    parameter MC_DATA_W             = 8;
-    parameter MST_ID_W              = 5;
-    parameter TRANS_DATA_LEN_W      = 8;
-    parameter TRANS_DATA_SIZE_W     = 3;
-    parameter TRANS_RESP_W          = 2;
-    parameter IP_DATA_BASE_ADDR     = 32'h2000_0000;
-    parameter IP_CONF_BASE_ADDR     = 32'h3000_0000;
-    parameter IP_CONF_OFFSET_ADDR   = 32'h01;
     parameter DBI_IF_D_W            = 8;
+    parameter TID_W                 = 2;
+    parameter TDEST_W               = 2;
+    parameter TDATA_W               = 256;
+    parameter TKEEP_W               = TDATA_W/8;
+    parameter TSTRB_W               = TDATA_W/8;
+    parameter AXIS_FIFO_D           = 2;    // AXI-Stream FIFO depth (width: 256)
+    parameter ATX_ID_W              = 5;
+    parameter ATX_ADDR_W            = 32;
+    parameter ATX_DATA_W            = 32;
+    parameter ATX_LEN_W             = 8;
+    parameter ATX_SIZE_W            = 3;
+    parameter ATX_RESP_W            = 2;
+    parameter ATX_BASE_ADDR         = 32'h1000_0000;    // AXI4 Address map
+    parameter TDEST_MASK            = 2'b00;            // AXIS Destination map
+    parameter IN_PXL_TYPE           = "GRAY";   // "GRAY": Gray pixel || "RGB": RGB565 pixel
+    parameter OUT_PXL_TYPE          = "RGB";    // Always "RGB" - RGB565 pixel
+    parameter FRM_COL_NUM           = 640;      // Maximum number of columns in 1 frame
+    parameter FRM_ROW_NUM           = 480;       // Maximum number of rows in 1 frame
     logic                      clk;
     logic                      rst_n;
-    logic  [MST_ID_W-1:0]      m_awid_i;
-    logic  [ADDR_W-1:0]        m_awaddr_i;
-    logic                      m_awvalid_i;
-    logic  [DMA_DATA_W-1:0]    m_wdata_i;
-    logic                      m_wlast_i;
-    logic                      m_wvalid_i;
-    logic                      m_bready_i;
-    logic  [MST_ID_W-1:0]      mc_awid_i;
-    logic  [ADDR_W-1:0]        mc_awaddr_i;
-    logic  [TRANS_DATA_LEN_W-1:0]  mc_awlen_i;
-    logic                      mc_awvalid_i;
-    logic  [MC_DATA_W-1:0]     mc_wdata_i;
-    logic                      mc_wlast_i;
-    logic                      mc_wvalid_i;
-    logic                      mc_bready_i;
-    logic  [MST_ID_W-1:0]      mc_arid_i;
-    logic  [ADDR_W-1:0]        mc_araddr_i;
-    logic                      mc_arvalid_i;
-    logic  [TRANS_DATA_LEN_W-1:0]  mc_arlen_i;
-    logic                      mc_rready_i;
-    logic                      m_awready_o;
-    logic                      m_wready_o;
-    logic  [MST_ID_W-1:0]      m_bid_o;
-    logic  [TRANS_RESP_W-1:0]  m_bresp_o;
-    logic                      m_bvalid_o;
-    logic                      mc_awready_o;
-    logic                      mc_wready_o;
-    logic  [MST_ID_W-1:0]      mc_bid_o;
-    logic  [TRANS_RESP_W-1:0]  mc_bresp_o;
-    logic                      mc_bvalid_o;
-    logic                      mc_arready_o;
-    logic  [MST_ID_W-1:0]      mc_rid_o;
-    logic  [MC_DATA_W-1:0]     mc_rdata_o;
-    logic  [TRANS_RESP_W-1:0]  mc_rresp_o;
-    logic                      mc_rlast_o;
-    logic                      mc_rvalid_o;
+    
+    // AXI-Stream interface
+    logic   [TID_W-1:0]             s_tid_i;    
+    logic   [TDEST_W-1:0]           s_tdest_i;
+    logic   [TDATA_W-1:0]           s_tdata_i;
+    logic   [TKEEP_W-1:0]           s_tkeep_i;
+    logic   [TSTRB_W-1:0]           s_tstrb_i;
+    logic                           s_tlast_i;
+    logic                           s_tvalid_i;
+    logic                           s_tready_o;
+    logic  [MST_ID_W-1:0]      s_awid_i;
+    logic  [ADDR_W-1:0]        s_awaddr_i;
+    logic  [TRANS_DATA_LEN_W-1:0]  s_awlen_i;
+    logic                      s_awvalid_i;
+    logic  [s_DATA_W-1:0]     s_wdata_i;
+    logic                      s_wlast_i;
+    logic                      s_wvalid_i;
+    logic                      s_bready_i;
+    logic  [MST_ID_W-1:0]      s_arid_i;
+    logic  [ADDR_W-1:0]        s_araddr_i;
+    logic                      s_arvalid_i;
+    logic  [TRANS_DATA_LEN_W-1:0]  s_arlen_i;
+    logic                      s_rready_i;
+
+    logic                      s_awready_o;
+    logic                      s_wready_o;
+    logic  [MST_ID_W-1:0]      s_bid_o;
+    logic  [TRANS_RESP_W-1:0]  s_bresp_o;
+    logic                      s_bvalid_o;
+    logic                      s_arready_o;
+    logic  [MST_ID_W-1:0]      s_rid_o;
+    logic  [s_DATA_W-1:0]     s_rdata_o;
+    logic  [TRANS_RESP_W-1:0]  s_rresp_o;
+    logic                      s_rlast_o;
+    logic                      s_rvalid_o;
     logic                      dbi_dcx_o;
     logic                      dbi_csx_o;
     logic                      dbi_resx_o;
@@ -65,7 +72,26 @@ module dbi_tx_controller_tb;
     wire  [DBI_IF_D_W-1:0]     dbi_d_o;
 
     dbi_tx_controller #(
-
+        .INTERNAL_CLK   (INTERNAL_CLK),
+        .DBI_IF_D_W     (DBI_IF_D_W),
+        .TID_W          (TID_W),
+        .TDEST_W        (TDEST_W),
+        .TDATA_W        (TDATA_W),
+        .TKEEP_W        (TKEEP_W),
+        .TSTRB_W        (TSTRB_W),
+        .AXIS_FIFO_D    (AXIS_FIFO_D),
+        .ATX_ID_W       (ATX_ID_W),
+        .ATX_ADDR_W     (ATX_ADDR_W),
+        .ATX_DATA_W     (ATX_DATA_W),
+        .ATX_LEN_W      (ATX_LEN_W),
+        .ATX_SIZE_W     (ATX_SIZE_W),
+        .ATX_RESP_W     (ATX_RESP_W),
+        .ATX_BASE_ADDR  (ATX_BASE_ADDR),
+        .TDEST_MASK     (TDEST_MASK),
+        .IN_PXL_TYPE    (IN_PXL_TYPE),
+        .OUT_PXL_TYPE   (OUT_PXL_TYPE),
+        .FRM_COL_NUM    (FRM_COL_NUM),
+        .FRM_ROW_NUM    (FRM_ROW_NUM),
     ) dut (
         .*
     );
@@ -73,34 +99,24 @@ module dbi_tx_controller_tb;
     initial begin
         clk             <= 0;
         rst_n           <= 1;
+        
+        s_awid_i       <= 0;
+        s_awaddr_i     <= 0;
+        s_awlen_i      <= 0;
+        s_awvalid_i    <= 0;
+        
+        s_wdata_i      <= 0;
+        s_wlast_i      <= 1'b1;
+        s_wvalid_i     <= 0;
+        
+        s_bready_i     <= 1'b1;
+        
+        s_arid_i       <= 0;
+        s_araddr_i     <= 0;
+        s_arlen_i      <= 0;
+        s_arvalid_i    <= 0;
 
-        m_awid_i        <= 0;
-        m_awaddr_i      <= 0;
-        m_awvalid_i     <= 0;
-        
-        m_wdata_i       <= 0;
-        m_wlast_i       <= 0;
-        m_wvalid_i      <= 0;
-        
-        m_bready_i      <= 1'b1;
-        
-        mc_awid_i       <= 0;
-        mc_awaddr_i     <= 0;
-        mc_awlen_i      <= 0;
-        mc_awvalid_i    <= 0;
-        
-        mc_wdata_i      <= 0;
-        mc_wlast_i      <= 1'b1;
-        mc_wvalid_i     <= 0;
-        
-        mc_bready_i     <= 1'b1;
-        
-        mc_arid_i       <= 0;
-        mc_araddr_i     <= 0;
-        mc_arlen_i      <= 0;
-        mc_arvalid_i    <= 0;
-
-        mc_rready_i     <= 1'b1;
+        s_rready_i     <= 1'b1;
 
         #(`RST_DLY_START)   rst_n <= 0;
         #(`RST_DUR)         rst_n <= 1;
@@ -114,150 +130,136 @@ module dbi_tx_controller_tb;
         #(`RST_DLY_START + `RST_DUR + 1);
         fork 
             begin   : AW_chn
-                mc_aw_transfer(.mc_awid(5'h00), .mc_awaddr(32'h3000_0001), .mc_awlen(8'h00));   // 1st
-                mc_aw_transfer(.mc_awid(5'h01), .mc_awaddr(32'h3100_0000), .mc_awlen(8'h04));   // 2nd
-                mc_aw_transfer(.mc_awid(5'h02), .mc_awaddr(32'h3100_0001), .mc_awlen(8'h03));   // 3rd
-                mc_aw_transfer(.mc_awid(5'h03), .mc_awaddr(32'h3100_0002), .mc_awlen(8'h06));   // 4th
+                s_aw_transfer(.s_awid(5'h00), .s_awaddr(32'h3000_0001), .s_awlen(8'h00));   // 1st
+                s_aw_transfer(.s_awid(5'h01), .s_awaddr(32'h3100_0000), .s_awlen(8'h04));   // 2nd
+                s_aw_transfer(.s_awid(5'h02), .s_awaddr(32'h3100_0001), .s_awlen(8'h03));   // 3rd
+                s_aw_transfer(.s_awid(5'h03), .s_awaddr(32'h3100_0002), .s_awlen(8'h06));   // 4th
                 aclk_cl;
-                mc_awvalid_i <= 1'b0;
+                s_awvalid_i <= 1'b0;
 
                 repeat(20) aclk_cl;
 
-                mc_aw_transfer(.mc_awid(5'h00), .mc_awaddr(32'h3000_0000), .mc_awlen(8'h00));   // 5th
+                s_aw_transfer(.s_awid(5'h00), .s_awaddr(32'h3000_0000), .s_awlen(8'h00));   // 5th
                 aclk_cl;
-                mc_awvalid_i <= 1'b0;
+                s_awvalid_i <= 1'b0;
 
                 repeat(2_200_000) aclk_cl;
 
-                mc_aw_transfer(.mc_awid(5'h00), .mc_awaddr(32'h3000_0000), .mc_awlen(8'h00));   // 6th
+                s_aw_transfer(.s_awid(5'h00), .s_awaddr(32'h3000_0000), .s_awlen(8'h00));   // 6th
                 aclk_cl;
-                mc_awvalid_i <= 1'b0;
+                s_awvalid_i <= 1'b0;
             end
             begin   : W_chn
                 // 1st
-                mc_w_transfer(.mc_wdata(8'h2C), .mc_wlast(1'b1));
+                s_w_transfer(.s_wdata(8'h2C), .s_wlast(1'b1));
                 // 2nd
-                mc_w_transfer(.mc_wdata(8'b0000_0010), .mc_wlast(1'b0));    // HW_RST
-                mc_w_transfer(.mc_wdata(8'b0001_0000), .mc_wlast(1'b0));    // 1 CMD - 4 DAT
-                mc_w_transfer(.mc_wdata(8'b0000_0100), .mc_wlast(1'b0));    // 1 CMD - 1 DAT
-                mc_w_transfer(.mc_wdata(8'b0000_1000), .mc_wlast(1'b0));    // 1 CMD - 2 DAT
-                mc_w_transfer(.mc_wdata(8'b0000_0000), .mc_wlast(1'b1));    // 1 CMD - 0 DAT
+                s_w_transfer(.s_wdata(8'b0000_0010), .s_wlast(1'b0));    // HW_RST
+                s_w_transfer(.s_wdata(8'b0001_0000), .s_wlast(1'b0));    // 1 CMD - 4 DAT
+                s_w_transfer(.s_wdata(8'b0000_0100), .s_wlast(1'b0));    // 1 CMD - 1 DAT
+                s_w_transfer(.s_wdata(8'b0000_1000), .s_wlast(1'b0));    // 1 CMD - 2 DAT
+                s_w_transfer(.s_wdata(8'b0000_0000), .s_wlast(1'b1));    // 1 CMD - 0 DAT
                 // 3rd
-                mc_w_transfer(.mc_wdata(8'h11), .mc_wlast(1'b0));
-                mc_w_transfer(.mc_wdata(8'h22), .mc_wlast(1'b0));
-                mc_w_transfer(.mc_wdata(8'h33), .mc_wlast(1'b0));
-                mc_w_transfer(.mc_wdata(8'h44), .mc_wlast(1'b1));
+                s_w_transfer(.s_wdata(8'h11), .s_wlast(1'b0));
+                s_w_transfer(.s_wdata(8'h22), .s_wlast(1'b0));
+                s_w_transfer(.s_wdata(8'h33), .s_wlast(1'b0));
+                s_w_transfer(.s_wdata(8'h44), .s_wlast(1'b1));
                 // 4th                
-                mc_w_transfer(.mc_wdata(8'h10), .mc_wlast(1'b0));
-                mc_w_transfer(.mc_wdata(8'h11), .mc_wlast(1'b0));
-                mc_w_transfer(.mc_wdata(8'h12), .mc_wlast(1'b0));
-                mc_w_transfer(.mc_wdata(8'h13), .mc_wlast(1'b0));
-                mc_w_transfer(.mc_wdata(8'h20), .mc_wlast(1'b0));
-                mc_w_transfer(.mc_wdata(8'h30), .mc_wlast(1'b0));
-                mc_w_transfer(.mc_wdata(8'h31), .mc_wlast(1'b1));
+                s_w_transfer(.s_wdata(8'h10), .s_wlast(1'b0));
+                s_w_transfer(.s_wdata(8'h11), .s_wlast(1'b0));
+                s_w_transfer(.s_wdata(8'h12), .s_wlast(1'b0));
+                s_w_transfer(.s_wdata(8'h13), .s_wlast(1'b0));
+                s_w_transfer(.s_wdata(8'h20), .s_wlast(1'b0));
+                s_w_transfer(.s_wdata(8'h30), .s_wlast(1'b0));
+                s_w_transfer(.s_wdata(8'h31), .s_wlast(1'b1));
                 // 5th
-                mc_w_transfer(.mc_wdata(8'b0000_0001), .mc_wlast(1'b1));    // Turn into CONF mode
+                s_w_transfer(.s_wdata(8'b0000_0001), .s_wlast(1'b1));    // Turn into CONF mode
                 // 6th
-                mc_w_transfer(.mc_wdata(8'b0000_0010), .mc_wlast(1'b1));    // Turn into CONF mode
+                s_w_transfer(.s_wdata(8'b0000_0010), .s_wlast(1'b1));    // Turn into CONF mode
                 aclk_cl;
-                mc_wvalid_i <= 1'b0;
+                s_wvalid_i <= 1'b0;
             end
             begin   : AR_chn
                 repeat(20) begin
                     aclk_cl;
                 end
-                mc_ar_transfer(.mc_arid(5'h00), .mc_araddr(32'h3100_0000), .mc_arlen(8'h02));
+                s_ar_transfer(.s_arid(5'h00), .s_araddr(32'h3100_0000), .s_arlen(8'h02));
                 aclk_cl;
-                mc_arvalid_i <= 1'b0;
+                s_arvalid_i <= 1'b0;
             end
         join_none
     end
-    initial begin : DMA_AXI4
+    initial begin : DMA_AXI
         localparam TX_PER_TXN = 2400;
         int tx_cnt;
         int byte_cnt;
         bit [DMA_DATA_W-1:0] dma_wdata;
         #(`RST_DLY_START + `RST_DUR + 1);
         fork
-            begin : DMA_AW
-                m_aw_transfer(.m_awid(5'h00), .m_awaddr(32'h2000_0000));
-                aclk_cl;
-                m_awvalid_i <= 1'b0;
-            end
             begin : DMA_W
                 for (tx_cnt=0; tx_cnt < TX_PER_TXN; tx_cnt++) begin
                     for (byte_cnt = 0; byte_cnt < (DMA_DATA_W/8); byte_cnt++) begin
                         dma_wdata[8*(byte_cnt+1)-1-:8] = (byte_cnt%2 == 0) ? '1 : '0;
                     end
-                    m_w_transfer(.m_wdata(dma_wdata), .m_wlast((tx_cnt==(TX_PER_TXN-1))));
+                    axis_transfer(.s_tdest(TDEST_MASK), .s_tdata(dma_wdata), .s_tlast((tx_cnt==(TX_PER_TXN-1))));
                 end
                 aclk_cl;
-                m_wvalid_i <= 1'b0;
+                s_tvalid_i <= 1'b0;
             end
         join_none
     end
 
     /* DeepCode */
-    task automatic mc_aw_transfer(
-        input [MST_ID_W-1:0]            mc_awid,
-        input [ADDR_W-1:0]              mc_awaddr,
-        input [TRANS_DATA_LEN_W-1:0]    mc_awlen
+    task automatic s_aw_transfer(
+        input [ATX_ID_W-1:0]    s_awid,
+        input [ATX_ADDR_W-1:0]  s_awaddr,
+        input [ATX_LEN_W-1:0]   s_awlen
     );
         aclk_cl;
-        mc_awid_i            <= mc_awid;
-        mc_awaddr_i          <= mc_awaddr;
-        mc_awlen_i           <= mc_awlen;
-        mc_awvalid_i         <= 1'b1;
+        s_awid_i            <= s_awid;
+        s_awaddr_i          <= s_awaddr;
+        s_awlen_i           <= s_awlen;
+        s_awvalid_i         <= 1'b1;
         // Handshake occur
-        wait(mc_awready_o == 1'b1); #0.1;
+        wait(s_awready_o == 1'b1); #0.1;
     endtask
-    task automatic mc_w_transfer (
-        input [MC_DATA_W-1:0]   mc_wdata,
-        input                   mc_wlast
+    task automatic s_w_transfer (
+        input [ATX_DATA_W-1:0]  s_wdata,
+        input                   s_wlast
     );
         aclk_cl;
-        mc_wdata_i          <= mc_wdata;
-        mc_wlast_i          <= mc_wlast;
-        mc_wvalid_i         <= 1'b1;
+        s_wdata_i          <= s_wdata;
+        s_wlast_i          <= s_wlast;
+        s_wvalid_i         <= 1'b1;
         // Handshake occur
-        wait(mc_wready_o == 1'b1); #0.1;
+        wait(s_wready_o == 1'b1); #0.1;
     endtask
-    task automatic mc_ar_transfer(
-        input [MST_ID_W-1:0]            mc_arid,
-        input [ADDR_W-1:0]              mc_araddr,
-        input [TRANS_DATA_LEN_W-1:0]    mc_arlen
+    task automatic s_ar_transfer(
+        input [ATX_ID_W-1:0]    s_arid,
+        input [ATX_ADDR_W-1:0]  s_araddr,
+        input [ATX_LEN_W-1:0]   s_arlen
     );
         aclk_cl;
-        mc_arid_i            <= mc_arid;
-        mc_araddr_i          <= mc_araddr;
-        mc_arlen_i           <= mc_arlen;
-        mc_arvalid_i         <= 1'b1;
+        s_arid_i            <= s_arid;
+        s_araddr_i          <= s_araddr;
+        s_arlen_i           <= s_arlen;
+        s_arvalid_i         <= 1'b1;
         // Handshake occur
-        wait(mc_arready_o == 1'b1); #0.1;
+        wait(s_arready_o == 1'b1); #0.1;
     endtask
 
     /* DMA task */
-    task automatic m_aw_transfer(
-        input [MST_ID_W-1:0]    m_awid,
-        input [ADDR_W-1:0]      m_awaddr
+    task automatic axis_transfer (
+        input [TDEST_W-1:0]     s_tdest,
+        input [TDATA_W-1:0]     s_tdata,
+        input                   s_tlast
     );
         aclk_cl;
-        m_awid_i            <= m_awid;
-        m_awaddr_i          <= m_awaddr;
-        m_awvalid_i         <= 1'b1;
+        s_tdest_i           <= s_tdest;
+        s_tdata_i           <= s_tdata;
+        s_tlast_i           <= s_tlast;
+        s_tvalid_i          <= 1'b1;
         // Handshake occur
-        wait(m_awready_o == 1'b1); #0.1;
-    endtask
-    task automatic m_w_transfer (
-        input [DMA_DATA_W-1:0]  m_wdata,
-        input                   m_wlast
-    );
-        aclk_cl;
-        m_wdata_i           <= m_wdata;
-        m_wvalid_i          <= 1'b1;
-        m_wlast_i           <= m_wlast;
-        // Handshake occur
-        wait(m_wready_o == 1'b1); #0.1;
+        wait(s_tready_o == 1'b1); #0.1;
     endtask
 
     task automatic aclk_cl;

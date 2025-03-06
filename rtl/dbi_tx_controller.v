@@ -1,89 +1,75 @@
 module dbi_tx_controller 
 #(
     parameter INTERNAL_CLK          = 125000000,
-    // AXI4 Interface
-    // -- DMA
-    parameter DMA_DATA_W            = 256,
-    parameter ADDR_W                = 32,
-    // -- Master Configuration BUS 
-    parameter MC_DATA_W             = 8,
-    // -- Common
-    parameter MST_ID_W              = 5,
-    parameter TRANS_DATA_LEN_W      = 8,
-    parameter TRANS_DATA_SIZE_W     = 3,
-    parameter TRANS_RESP_W          = 2,
-    // Memory Mapping
-    parameter IP_STM_BASE_ADDR      = 32'h2000_0000,
-    parameter IP_CONF_REG_BASE_ADDR = 32'h3000_0000,
-    parameter IP_CONF_TX_BASE_ADDR  = 32'h3100_0000,
-    parameter IP_CONF_OFFSET_ADDR   = 32'h01,
     // DBI Interface
-    parameter DBI_IF_D_W            = 8
-    
+    parameter DBI_IF_D_W            = 8,
+    // AXI-Stream Configuration
+    parameter TID_W                 = 2,
+    parameter TDEST_W               = 2,
+    parameter TDATA_W               = 256,
+    parameter TKEEP_W               = TDATA_W/8,
+    parameter TSTRB_W               = TDATA_W/8,
+    parameter AXIS_FIFO_D           = 2,    // AXI-Stream FIFO depth (width: 256)
+    // AXI4 Configuration 
+    parameter ATX_ID_W              = 5,
+    parameter ATX_ADDR_W            = 32,
+    parameter ATX_DATA_W            = 32,
+    parameter ATX_LEN_W             = 8,
+    parameter ATX_SIZE_W            = 3,
+    parameter ATX_RESP_W            = 2,
+    // Mapping
+    parameter ATX_BASE_ADDR         = 32'h1000_0000,    // AXI4 Address map
+    parameter TDEST_MASK            = 2'b00,            // AXIS Destination map
+    // Image format
+    parameter IN_PXL_TYPE           = "GRAY",   // "GRAY": Gray pixel || "RGB": RGB565 pixel
+    parameter OUT_PXL_TYPE          = "RGB",    // Always "RGB" - RGB565 pixel
+    parameter FRM_COL_NUM           = 640,      // Maximum number of columns in 1 frame
+    parameter FRM_ROW_NUM           = 480       // Maximum number of rows in 1 frame
 ) (
-    // Input declaration
     input                           clk,
     input                           rst_n,
-    // -- AXI4 Master DMA
-    // -- -- AW channel
-    input   [MST_ID_W-1:0]          m_awid_i,
-    input   [ADDR_W-1:0]            m_awaddr_i,
-    input                           m_awvalid_i,
-    // -- -- W channel
-    input   [DMA_DATA_W-1:0]        m_wdata_i,
-    input                           m_wlast_i,
-    input                           m_wvalid_i,
-    // -- -- B channel
-    input                           m_bready_i,
-    // -- AXI4 Master configuration line (master)
-    // -- -- AW channel
-    input   [MST_ID_W-1:0]          mc_awid_i,
-    input   [ADDR_W-1:0]            mc_awaddr_i,
-    input   [1:0]                   mc_awburst_i,        
-    input   [TRANS_DATA_LEN_W-1:0]  mc_awlen_i,
-    input                           mc_awvalid_i,
-    // -- -- W channel
-    input   [MC_DATA_W-1:0]         mc_wdata_i,
-    input                           mc_wlast_i,
-    input                           mc_wvalid_i,
-    // -- -- B channel
-    input                           mc_bready_i,
-    // -- -- AR channel
-    input   [MST_ID_W-1:0]          mc_arid_i,
-    input   [ADDR_W-1:0]            mc_araddr_i,
-    input   [1:0]                   mc_arburst_i,
-    input   [TRANS_DATA_LEN_W-1:0]  mc_arlen_i,
-    input                           mc_arvalid_i,
-    // -- -- R channel
-    input                           mc_rready_i,
-    // Output declaration
-    // -- AXI4 DMA (master)
-    // -- -- AW channel
-    output                          m_awready_o,
-    // -- -- W channel
-    output                          m_wready_o,
-    // -- -- B channel
-    output  [MST_ID_W-1:0]          m_bid_o,
-    output  [TRANS_RESP_W-1:0]      m_bresp_o,
-    output                          m_bvalid_o,
-    // -- AXI4 Master configuration line
-    // -- -- AW channel
-    output                          mc_awready_o,
-    // -- -- W channel
-    output                          mc_wready_o,
-    // -- -- B channel
-    output  [MST_ID_W-1:0]          mc_bid_o,
-    output  [TRANS_RESP_W-1:0]      mc_bresp_o,
-    output                          mc_bvalid_o,
-    // -- -- AR channel
-    output                          mc_arready_o,
-    // -- -- R channel
-    output  [MST_ID_W-1:0]          mc_rid_o,
-    output  [MC_DATA_W-1:0]         mc_rdata_o,
-    output  [TRANS_RESP_W-1:0]      mc_rresp_o,
-    output                          mc_rlast_o,
-    output                          mc_rvalid_o,
-    // -- DBI TX interface
+    // AXI-Stream interface
+    input   [TID_W-1:0]             s_tid_i,    
+    input   [TDEST_W-1:0]           s_tdest_i,
+    input   [TDATA_W-1:0]           s_tdata_i,
+    input   [TKEEP_W-1:0]           s_tkeep_i,
+    input   [TSTRB_W-1:0]           s_tstrb_i,
+    input                           s_tlast_i,
+    input                           s_tvalid_i,
+    output                          s_tready_o,
+    // AXI4 Master configuration line
+    // -- AW channel
+    input   [ATX_ID_W-1:0]          s_awid_i,
+    input   [ATX_ADDR_W-1:0]        s_awaddr_i,
+    input   [1:0]                   s_awburst_i,        
+    input   [ATX_LEN_W-1:0]         s_awlen_i,
+    input                           s_awvalid_i,
+    output                          s_awready_o,
+    // -- W channel
+    input   [ATX_DATA_W-1:0]        s_wdata_i,
+    input                           s_wlast_i,
+    input                           s_wvalid_i,
+    output                          s_wready_o,
+    // -- B channel
+    output  [ATX_ID_W-1:0]          s_bid_o,
+    output  [ATX_RESP_W-1:0]        s_bresp_o,
+    output                          s_bvalid_o,
+    input                           s_bready_i,
+    // -- AR channel
+    input   [ATX_ID_W-1:0]          s_arid_i,
+    input   [ATX_ADDR_W-1:0]        s_araddr_i,
+    input   [1:0]                   s_arburst_i,
+    input   [ATX_LEN_W-1:0]         s_arlen_i,
+    input                           s_arvalid_i,
+    output                          s_arready_o,
+    // -- R channel
+    output  [ATX_ID_W-1:0]          s_rid_o,
+    output  [ATX_DATA_W-1:0]        s_rdata_o,
+    output  [ATX_RESP_W-1:0]        s_rresp_o,
+    output                          s_rlast_o,
+    output                          s_rvalid_o,
+    input                           s_rready_i,
+    // DBI TX interface
     output                          dbi_dcx_o,
     output                          dbi_csx_o,
     output                          dbi_resx_o,
@@ -92,197 +78,168 @@ module dbi_tx_controller
     inout   [DBI_IF_D_W-1:0]        dbi_d_o 
 );
     // Local parameters 
-    localparam DBI_CONF_REG     = 1 + 1;        // DBI_CTRL_ST + DBI_MEM_COM
-    localparam DBI_TX_FIFO_NUM  = 1 + 1 + 1;    // TX_TYPE + TX_COM + TX_DATA
-    
-    // Internal varibles
-    genvar conf_reg_idx;
-    genvar conf_tx_ff_idx;
-    // Internal signal
-    wire    [1:0]                   dbi_ctrl_mode;
-    wire    [DBI_IF_D_W-1:0]        dbi_mem_com;
-    wire    [DBI_IF_D_W-1:0]        conf_reg        [0:DBI_CONF_REG-1];
-    wire                            tx_type_rw;
-    wire                            tx_type_hrst;
-    wire    [2:0]                   tx_type_dat_amt;
-    wire                            tx_type_vld;
-    wire                            tx_type_rdy;
-    wire    [DBI_IF_D_W-1:0]        tx_com;
-    wire                            tx_com_vld;
-    wire                            tx_com_rdy;
-    wire    [DBI_IF_D_W-1:0]        tx_data;
-    wire                            tx_data_vld;
-    wire                            tx_data_rdy;
-    wire    [DBI_IF_D_W-1:0]        tx_fifo_dat     [0:DBI_TX_FIFO_NUM-1];
-    wire    [DBI_TX_FIFO_NUM-1:0]   tx_fifo_vld;
-    wire    [DBI_TX_FIFO_NUM-1:0]   tx_fifo_rdy;
-
-    wire    [MC_DATA_W*DBI_TX_FIFO_NUM-1:0] tx_fifo_flat;
-    wire    [MC_DATA_W*DBI_CONF_REG-1:0]    conf_reg_flat;
-
-    wire                        dtp_d_rdy;
-    wire                        dtp_d_vld;
-    wire    [DBI_IF_D_W-1:0]    dtp_d_data;
-
-    wire    [DBI_IF_D_W-1:0]    rgb_pxl_dat;
-    wire                        rgb_pxl_vld;
-    wire                        rgb_pxl_rdy;
-
+    localparam GRAY_PXL_W   = 8;
+    localparam RGB_PXL_W    = 16;   // RGB565
+    localparam IN_PXL_W     = (IN_PXL_TYPE == "GRAY") ? GRAY_PXL_W : RGB_PXL_W;
+    localparam OUT_PXL_W    = RGB_PXL_W; // Always RGB565
+    localparam FRM_DIM_MAX  = (FRM_COL_NUM > FRM_ROW_NUM) ? FRM_COL_NUM : FRM_ROW_NUM;
+    localparam FRM_DIM_W    = $clog2(FRM_DIM_MAX);  // Each dimension width
+    // Registers Map
+    wire    [1:0]               dbi_ctrl_mode;
+    wire    [DBI_IF_D_W-1:0]    dbi_mem_com;
+    wire                        tx_type_rw;
+    wire                        tx_type_hrst;
+    wire    [2:0]               tx_type_dat_amt;
+    wire                        tx_type_vld;
+    wire                        tx_type_rdy;
+    wire    [DBI_IF_D_W-1:0]    tx_com;
+    wire                        tx_com_vld;
+    wire                        tx_com_rdy;
+    wire    [DBI_IF_D_W-1:0]    tx_data;
+    wire                        tx_data_vld;
+    wire                        tx_data_rdy;
+    wire    [FRM_DIM_W-1:0]     frm_width;
+    wire    [FRM_DIM_W-1:0]     frm_height;
+    // Input Pixel data
+    wire    [IN_PXL_W-1:0]      in_pxl_dat;
+    wire                        in_pxl_vld;
+    wire                        in_pxl_rdy;
+    // Adapted Pixel
+    wire    [OUT_PXL_W-1:0]     adp_pxl_dat;
+    wire                        adp_pxl_vld;
+    wire                        adp_pxl_rdy;
+    // Adapted Pixel
+    wire    [DBI_IF_D_W-1:0]    dbi_pxl_dat;
+    wire                        dbi_pxl_vld;
+    wire                        dbi_pxl_rdy;
+    // State Machine to PHY Controller
     wire                        dtp_dbi_hrst;
     wire    [DBI_IF_D_W-1:0]    dtp_tx_cmd_typ;
     wire    [DBI_IF_D_W-1:0]    dtp_tx_cmd_dat;
-    wire                        dtp_tx_last;
     wire                        dtp_tx_no_dat;
+    wire                        dtp_tx_last;
     wire                        dtp_tx_vld;
     wire                        dtp_tx_rdy;
-   
-    // Memory mapping
-    // -- BASE: 0x3000_0000 - OFFSET: 0-1
-    assign dbi_ctrl_mode        = conf_reg   [8'd00][1:0];
-    assign dbi_mem_com          = conf_reg   [8'd01];
-    // -- BASE: 0x3100_0000 - OFFSET: 0
-    assign tx_type_rw           = tx_fifo_dat[8'd00][0];
-    assign tx_type_hrst         = tx_fifo_dat[8'd00][1];
-    assign tx_type_dat_amt      = tx_fifo_dat[8'd00][4:2];
-    assign tx_type_vld          = tx_fifo_vld[8'd00];
-    assign tx_fifo_rdy[8'd00]   = tx_type_rdy;
-    // -- BASE: 0x3100_0000 - OFFSET: 1
-    assign tx_com               = tx_fifo_dat[8'd01];
-    assign tx_com_vld           = tx_fifo_vld[8'd01];
-    assign tx_fifo_rdy[8'd01]   = tx_com_rdy;
-    // -- BASE: 0x3100_0000 - OFFSET: 2
-    assign tx_data              = tx_fifo_dat[8'd02];
-    assign tx_data_vld          = tx_fifo_vld[8'd02];
-    assign tx_fifo_rdy[8'd02]   = tx_data_rdy;
-
-    // De-flatten
-generate
-    for(conf_reg_idx = 0; conf_reg_idx < DBI_CONF_REG; conf_reg_idx = conf_reg_idx + 1) begin : DEFLAT_0
-        assign conf_reg[conf_reg_idx] = conf_reg_flat[(conf_reg_idx+1)*MC_DATA_W-1-:MC_DATA_W];
-    end
-    for(conf_tx_ff_idx = 0; conf_tx_ff_idx < DBI_TX_FIFO_NUM; conf_tx_ff_idx = conf_tx_ff_idx + 1) begin : DEFLAT_1
-        assign tx_fifo_dat[conf_tx_ff_idx] = tx_fifo_flat[(conf_tx_ff_idx+1)*MC_DATA_W-1-:MC_DATA_W];
-    end
-endgenerate
     // Module instances
-    axi4_ctrl #(
-        .AXI4_CTRL_CONF     (1),    // CONF_REG:    On
-        .AXI4_CTRL_STAT     (0),    // STATUS_REG:  Off
-        .AXI4_CTRL_MEM      (0),    // MEM:         Off
-        .AXI4_CTRL_WR_ST    (1),    // TX_FIFO:     On
-        .AXI4_CTRL_RD_ST    (0),    // RX_FIFO:     Off
-        .CONF_BASE_ADDR     (IP_CONF_REG_BASE_ADDR),
-        .CONF_OFFSET        (IP_CONF_OFFSET_ADDR),
-        .CONF_REG_NUM       (DBI_CONF_REG),
-        .ST_WR_BASE_ADDR    (IP_CONF_TX_BASE_ADDR),
-        .ST_WR_OFFSET       (IP_CONF_OFFSET_ADDR),
-        .ST_WR_FIFO_NUM     (DBI_TX_FIFO_NUM),
-        .ST_WR_FIFO_DEPTH   (16),
-        .ST_RD_BASE_ADDR    (),
-        .ST_RD_OFFSET       (),
-        .ST_RD_FIFO_NUM     (),
-        .ST_RD_FIFO_DEPTH   (),
-
-        .DATA_W             (MC_DATA_W),
-        .ADDR_W             (ADDR_W),
-        .MST_ID_W           (MST_ID_W),
-        .TRANS_DATA_LEN_W   (TRANS_DATA_LEN_W),
-        .TRANS_DATA_SIZE_W  (TRANS_DATA_SIZE_W),
-        .TRANS_RESP_W       (TRANS_RESP_W)
-    ) acr (
+    // -- Registers Map
+    dtc_reg_map #(
+        .DBI_IF_D_W         (DBI_IF_D_W),
+        .ATX_ID_W           (ATX_ID_W),
+        .ATX_ADDR_W         (ATX_ADDR_W),
+        .ATX_DATA_W         (ATX_DATA_W),
+        .ATX_LEN_W          (ATX_LEN_W),
+        .ATX_SIZE_W         (ATX_SIZE_W),
+        .ATX_RESP_W         (ATX_RESP_W),
+        .ATX_BASE_ADDR      (ATX_BASE_ADDR),
+        .FRM_DIM_W          (FRM_DIM_W)
+    ) rm (
+        .aclk               (clk),
+        .aresetn            (rst_n),
+        .s_awid_i           (s_awid_i),
+        .s_awaddr_i         (s_awaddr_i),
+        .s_awburst_i        (s_awburst_i),
+        .s_awlen_i          (s_awlen_i),
+        .s_awvalid_i        (s_awvalid_i),
+        .s_awready_o        (s_awready_o),
+        .s_wdata_i          (s_wdata_i),
+        .s_wlast_i          (s_wlast_i),
+        .s_wvalid_i         (s_wvalid_i),
+        .s_wready_o         (s_wready_o),
+        .s_bid_o            (s_bid_o),
+        .s_bresp_o          (s_bresp_o),
+        .s_bvalid_o         (s_bvalid_o),
+        .s_bready_i         (s_bready_i),
+        .s_arid_i           (s_arid_i),
+        .s_araddr_i         (s_araddr_i),
+        .s_arburst_i        (s_arburst_i),
+        .s_arlen_i          (s_arlen_i),
+        .s_arvalid_i        (s_arvalid_i),
+        .s_arready_o        (s_arready_o),
+        .s_rid_o            (s_rid_o),
+        .s_rdata_o          (s_rdata_o),
+        .s_rresp_o          (s_rresp_o),
+        .s_rlast_o          (s_rlast_o),
+        .s_rvalid_o         (s_rvalid_o),
+        .s_rready_i         (s_rready_i),
+        .dbi_ctrl_mode      (dbi_ctrl_mode),
+        .dbi_mem_com        (dbi_mem_com),
+        .tx_type_rw         (tx_type_rw),
+        .tx_type_hrst       (tx_type_hrst),
+        .tx_type_dat_amt    (tx_type_dat_amt),
+        .tx_type_vld        (tx_type_vld),
+        .tx_type_rdy        (tx_type_rdy),
+        .tx_com             (tx_com),
+        .tx_com_vld         (tx_com_vld),
+        .tx_com_rdy         (tx_com_rdy),
+        .tx_data            (tx_data),
+        .tx_data_vld        (tx_data_vld),
+        .tx_data_rdy        (tx_data_rdy),
+        .frm_width          (frm_width),
+        .frm_height         (frm_height)
+    );
+    // -- AXI-Stream to Pixel
+    dtc_axis_pxl #(
+        .TID_W              (TID_W),
+        .TDEST_W            (TDEST_W),
+        .TDATA_W            (TDATA_W),
+        .TKEEP_W            (TKEEP_W),
+        .TSTRB_W            (TSTRB_W),
+        .TDEST_MASK         (TDEST_MASK),
+        .AXIS_FIFO_D        (AXIS_FIFO_D),
+        .IN_PXL_TYPE        (IN_PXL_TYPE),
+        .GRAY_PXL_W         (GRAY_PXL_W),
+        .RGB_PXL_W          (RGB_PXL_W),
+        .IN_PXL_W           (IN_PXL_W)
+    ) ap (
         .clk                (clk),
         .rst_n              (rst_n),
-        .m_awid_i           (mc_awid_i),
-        .m_awaddr_i         (mc_awaddr_i),
-        .m_awburst_i        (mc_awburst_i),
-        .m_awlen_i          (mc_awlen_i),
-        .m_awvalid_i        (mc_awvalid_i),
-        .m_wdata_i          (mc_wdata_i),
-        .m_wlast_i          (mc_wlast_i),
-        .m_wvalid_i         (mc_wvalid_i),
-        .m_bready_i         (mc_bready_i),
-        .m_arid_i           (mc_arid_i),
-        .m_araddr_i         (mc_araddr_i),
-        .m_arburst_i        (mc_arburst_i),
-        .m_arlen_i          (mc_arlen_i),
-        .m_arvalid_i        (mc_arvalid_i),
-        .m_rready_i         (mc_rready_i),
-        .stat_reg_i         (),
-        .mem_wr_rdy_i       (),
-        .mem_rd_data_i      (),
-        .mem_rd_rdy_i       (),
-        .wr_st_rd_vld_i     (tx_fifo_rdy),
-        .rd_st_wr_data_i    (),
-        .rd_st_wr_vld_i     (),
-        .m_awready_o        (mc_awready_o),
-        .m_wready_o         (mc_wready_o),
-        .m_bid_o            (mc_bid_o),
-        .m_bresp_o          (mc_bresp_o),
-        .m_bvalid_o         (mc_bvalid_o),
-        .m_arready_o        (mc_arready_o),
-        .m_rid_o            (mc_rid_o),
-        .m_rdata_o          (mc_rdata_o),
-        .m_rresp_o          (mc_rresp_o),
-        .m_rlast_o          (mc_rlast_o),
-        .m_rvalid_o         (mc_rvalid_o),
-        .conf_reg_o         (conf_reg_flat),
-        .mem_wr_data_o      (),
-        .mem_wr_addr_o      (), 
-        .mem_wr_vld_o       (),
-        .mem_rd_addr_o      (),
-        .mem_rd_vld_o       (),
-        .wr_st_rd_data_o    (tx_fifo_flat),
-        .wr_st_rd_rdy_o     (tx_fifo_vld),
-        .rd_st_wr_rdy_o     ()
+        .s_tid_i            (s_tid_i),
+        .s_tdest_i          (s_tdest_i),
+        .s_tdata_i          (s_tdata_i),
+        .s_tkeep_i          (s_tkeep_i),
+        .s_tstrb_i          (s_tstrb_i),
+        .s_tlast_i          (s_tlast_i),
+        .s_tvalid_i         (s_tvalid_i),
+        .s_tready_o         (s_tready_o),
+        .pxl_dat_o          (in_pxl_dat),
+        .pxl_vld_o          (in_pxl_vld),
+        .pxl_rdy_i          (in_pxl_rdy)
     );
-
-    axi4_fifo #(
-        .BASE_ADDR          (IP_STM_BASE_ADDR),
-        .DATA_W             (DMA_DATA_W),
-        .ADDR_W             (ADDR_W),
-        .MST_ID_W           (MST_ID_W),
-        .TRANS_DATA_LEN_W   (TRANS_DATA_LEN_W),
-        .TRANS_DATA_SIZE_W  (TRANS_DATA_SIZE_W),
-        .TRANS_RESP_W       (TRANS_RESP_W)
-    ) af (
+    // -- Pixel Adapter
+    dtc_pxl_adapter #(
+        .IN_PXL_TYPE        (IN_PXL_TYPE),
+        .GRAY_PXL_W         (GRAY_PXL_W),
+        .RGB_PXL_W          (RGB_PXL_W),
+        .IN_PXL_W           (IN_PXL_W)
+    ) pa (
         .clk                (clk),
         .rst_n              (rst_n),
-        .m_awid_i           (m_awid_i),
-        .m_awaddr_i         (m_awaddr_i),
-        .m_awvalid_i        (m_awvalid_i),
-        .m_wdata_i          (m_wdata_i),
-        .m_wlast_i          (m_wlast_i),
-        .m_wvalid_i         (m_wvalid_i),
-        .m_bready_i         (m_bready_i),
-        .dtp_d_rdy_i        (dtp_d_rdy),
-        .m_awready_o        (m_awready_o),
-        .m_wready_o         (m_wready_o),
-        .m_bid_o            (m_bid_o),
-        .m_bresp_o          (m_bresp_o),
-        .m_bvalid_o         (m_bvalid_o),
-        .dtp_d_data_o       (dtp_d_data),
-        .dtp_d_vld_o        (dtp_d_vld)
+        .in_pxl_dat         (in_pxl_dat),
+        .in_pxl_vld         (in_pxl_vld),
+        .in_pxl_rdy         (in_pxl_rdy),
+        .out_pxl_dat        (adp_pxl_dat),
+        .out_pxl_vld        (adp_pxl_vld),
+        .out_pxl_rdy        (adp_pxl_rdy)
     );
-
-    gray_to_rgb #(
-        .GRAY_PXL_W         (8),
-        .RGB_PXL_W          (16),
-        .RGB_SPLIT_W        (8)
-    ) g2r (
+    // -- DBI Data Aligner
+    dtc_dbi_aligner #(
+        .PROC_PXL_W         (OUT_PXL_W),
+        .DBI_IF_D_W         (DBI_IF_D_W)
+    ) da (
         .clk                (clk),
         .rst_n              (rst_n),
-        .gray_pxl_dat_i     (dtp_d_data),
-        .gray_pxl_vld_i     (dtp_d_vld),
-        .rgb_pxl_rdy_i      (rgb_pxl_rdy),
-        .gray_pxl_rdy_o     (dtp_d_rdy),
-        .rgb_pxl_dat_o      (rgb_pxl_dat),
-        .rgb_pxl_vld_o      (rgb_pxl_vld)
+        .proc_pxl_dat       (adp_pxl_dat),
+        .proc_pxl_vld       (adp_pxl_vld),
+        .proc_pxl_rdy       (adp_pxl_rdy),
+        .dbi_pxl_dat        (dbi_pxl_dat),
+        .dbi_pxl_vld        (dbi_pxl_vld),
+        .dbi_pxl_rdy        (dbi_pxl_rdy)
     );
-
-    dbi_tx_fsm #(
+    // -- State Machine 
+    dtc_state_machine #(
         .INTERNAL_CLK       (INTERNAL_CLK),
         .DBI_IF_D_W         (DBI_IF_D_W)
-    ) dtf (
+    ) sm (
         .clk                (clk),
         .rst_n              (rst_n),
         .dbi_ctrl_mode_i    (dbi_ctrl_mode),
@@ -295,24 +252,27 @@ endgenerate
         .tx_com_vld_i       (tx_com_vld),
         .tx_data_i          (tx_data),
         .tx_data_vld_i      (tx_data_vld),
-        .pxl_d_i            (rgb_pxl_dat),
-        .pxl_vld_i          (rgb_pxl_vld),
+        .pxl_d_i            (dbi_pxl_dat),
+        .pxl_vld_i          (dbi_pxl_vld),
         .dtp_tx_rdy_i       (dtp_tx_rdy),
         .tx_type_rdy_o      (tx_type_rdy),
         .tx_com_rdy_o       (tx_com_rdy),
         .tx_data_rdy_o      (tx_data_rdy),
-        .pxl_rdy_o          (rgb_pxl_rdy),
+        .pxl_rdy_o          (dbi_pxl_rdy),
         .dtp_dbi_hrst_o     (dtp_dbi_hrst),
         .dtp_tx_cmd_typ_o   (dtp_tx_cmd_typ),
         .dtp_tx_cmd_dat_o   (dtp_tx_cmd_dat),
         .dtp_tx_last_o      (dtp_tx_last),
         .dtp_tx_no_dat_o    (dtp_tx_no_dat),
-        .dtp_tx_vld_o       (dtp_tx_vld)
+        .dtp_tx_vld_o       (dtp_tx_vld),
+        .frm_width          (frm_width),
+        .frm_height         (frm_height)
     );
-
-    dbi_tx_phy #(
-        .INTERNAL_CLK       (INTERNAL_CLK)
-    ) dtp (
+    // -- PHY Controller
+    dtc_phy_ctrl #(
+        .INTERNAL_CLK       (INTERNAL_CLK),
+        .DBI_IF_D_W         (DBI_IF_D_W)
+    ) pc (
         .clk                (clk),
         .rst_n              (rst_n),
         .dtf_dbi_hrst_i     (dtp_dbi_hrst),

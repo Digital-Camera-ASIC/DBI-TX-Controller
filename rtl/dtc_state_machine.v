@@ -1,8 +1,10 @@
-module dbi_tx_fsm 
+module dtc_state_machine 
 #(
     parameter INTERNAL_CLK      = 125000000,
     // DBI Interface
-    parameter DBI_IF_D_W        = 8
+    parameter DBI_IF_D_W        = 8,
+    // Image
+    parameter FRM_DIM_W         = 16
 ) 
 (
     // Input declaration
@@ -37,7 +39,10 @@ module dbi_tx_fsm
     output  [DBI_IF_D_W-1:0]    dtp_tx_cmd_dat_o,
     output                      dtp_tx_last_o,
     output                      dtp_tx_no_dat_o,
-    output                      dtp_tx_vld_o
+    output                      dtp_tx_vld_o,
+    // Frame CSRs
+    input   [FRM_DIM_W-1:0]     frm_width,
+    input   [FRM_DIM_W-1:0]     frm_height
 );
     // Local parameters
     localparam IDLE_ST          = 2'd0;
@@ -84,10 +89,19 @@ module dbi_tx_fsm
     reg                         tx_type_rdy;
     reg                         tx_com_rdy;
     reg                         tx_data_rdy;
+    reg     [FRM_DIM_W-1:0]     frm_w_cnt_d;
+    reg     [FRM_DIM_W-1:0]     frm_h_cnt_d;
+    reg                         first_hpxl_ack_d;
+    wire                        dtp_tx_hsk;
+    wire                        frm_w_wrap;
+    wire                        frm_h_wrap;
     // -- reg
     reg     [1:0]               dbi_tx_st_q;
     reg     [RST_STALL_W-1:0]   rst_stall_cnt_q;
     reg     [DBI_TX_CNT_W-1:0]  dbi_tx_cnt_q;
+    reg     [FRM_DIM_W-1:0]     frm_w_cnt_q;
+    reg     [FRM_DIM_W-1:0]     frm_h_cnt_q;
+    reg                         first_hpxl_ack_q;
 
     // Combination logic
     assign tx_type_rdy_o    = tx_type_rdy;
@@ -100,11 +114,17 @@ module dbi_tx_fsm
     assign dtp_tx_no_dat_o  = dtp_tx_no_dat;
     assign dtp_tx_vld_o     = dtp_tx_vld;
     assign pxl_rdy_o        = rgb_pxl_rdy;
+    assign frm_w_wrap       = ~|frm_w_cnt_q; // == 0
+    assign frm_h_wrap       = ~|frm_h_cnt_q; // == 0
+    assign dtp_tx_hsk       = dtp_tx_rdy_i & dtp_tx_vld_o;
       
     always @(*) begin
         dbi_tx_st_d         = dbi_tx_st_q;
         rst_stall_cnt_d     = (RST_STALL_CYC - 1'b1);   // Set up for Reset state
         dbi_tx_cnt_d        = dbi_tx_cnt_q;
+        frm_w_cnt_d         = frm_w_cnt_q;
+        frm_h_cnt_d         = frm_h_cnt_q;
+        first_hpxl_ack_d    = first_hpxl_ack_q;
         dtp_tx_cmd_typ      = tx_com_i;
         dtp_tx_cmd_dat      = tx_data_i;
         tx_type_rdy         = 1'b0;
@@ -124,6 +144,9 @@ module dbi_tx_fsm
                 else if (~|(dbi_ctrl_mode_i ^ STREAM_MODE) && pxl_vld_i) begin  // The controller is in STREAM mode and The pixels is ready 
                     dbi_tx_st_d = DBI_STREAM_TX;
                     dbi_tx_cnt_d = DBI_TX_PER_TXN - 1'b1;
+                    frm_w_cnt_d = frm_width - 1'b1;
+                    frm_h_cnt_d = frm_height - 1'b1;
+                    first_hpxl_ack_d = 1'b0;
                 end
             end
             DBI_RST_STALL_ST: begin
@@ -153,8 +176,21 @@ module dbi_tx_fsm
                 dtp_tx_cmd_typ  = dbi_mem_com_i;
                 dtp_tx_cmd_dat  = pxl_d_i;
                 dtp_tx_vld      = pxl_vld_i; 
-                dbi_tx_cnt_d    = dbi_tx_cnt_q - (dtp_tx_rdy_i & dtp_tx_vld_o);
-                dtp_tx_last     = (~|dbi_tx_cnt_q);
+                dbi_tx_cnt_d    = dbi_tx_cnt_q - dtp_tx_hsk;
+                if(dtp_tx_hsk) begin
+                    first_hpxl_ack_d = ~first_hpxl_ack_q; 
+                    if(first_hpxl_ack_q) begin
+                        frm_w_cnt_d = frm_w_cnt_q - 1'b1;
+                        if(frm_w_wrap) begin
+                            frm_w_cnt_d = frm_width - 1'b1; // Reset
+                            frm_h_cnt_d = frm_h_cnt_q - 1'b1;
+                            if(frm_h_wrap) begin
+                                frm_h_cnt_d = frm_height - 1'b1; // Reset
+                                dtp_tx_last = 1'b1;
+                            end
+                        end
+                    end
+                end
                 // FSM
                 dbi_tx_st_d = (dtp_tx_rdy_i & dtp_tx_vld_o & dtp_tx_last) ? IDLE_ST : dbi_tx_st_q; // When a transaction is completed, go back to IDLE state
             end
@@ -175,5 +211,17 @@ module dbi_tx_fsm
     end
     always @(posedge clk) begin
         dbi_tx_cnt_q <= dbi_tx_cnt_d;
+    end
+    always @(posedge clk or negedge rst_n) begin
+        if(~rst_n) begin
+            frm_w_cnt_q <= {FRM_DIM_W{1'b0}};
+            frm_h_cnt_q <= {FRM_DIM_W{1'b0}};
+            first_hpxl_ack_q <= 1'b0;
+        end
+        else begin
+            frm_w_cnt_q <= frm_w_cnt_d;
+            frm_h_cnt_q <= frm_h_cnt_d;
+            first_hpxl_ack_q <= first_hpxl_ack_d;
+        end
     end
 endmodule
