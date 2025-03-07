@@ -262,7 +262,7 @@ module dtc_phy_ctrl #(
     end
     always @(posedge clk) begin
         if (~rst_n) begin
-            tx_cnt_q <= 2'd00;
+            tx_cnt_q <= 2'd0;
         end
         else begin
             tx_cnt_q <= tx_cnt_d;

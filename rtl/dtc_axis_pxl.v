@@ -85,5 +85,5 @@ module dtc_axis_pxl #(
     // Combinational logic
     assign axis_map_vld = ~|(s_tdest_i ^ TDEST_MASK);   // s_tdest_i == TDEST_MASK
     assign s_tvalid_flt = s_tvalid_i & axis_map_vld;
-    assign s_tready_o   = s_tready_ff & s_tvalid_flt; // Only assert when (AXIS FIFO is ready) & (TVALID is mapping)
+    assign s_tready_o   = s_tready_ff & axis_map_vld; // Only assert when (AXIS FIFO is ready) & (TVALID is mapping)
 endmodule

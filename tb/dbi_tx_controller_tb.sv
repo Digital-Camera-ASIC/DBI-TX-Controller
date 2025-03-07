@@ -4,7 +4,7 @@
 `define RST_DLY_START   3
 `define RST_DUR         9
 
-`define END_TIME        1800000
+`define END_TIME        54000000
 
 module dbi_tx_controller_tb;
     parameter INTERNAL_CLK          = 125000000;
@@ -31,45 +31,47 @@ module dbi_tx_controller_tb;
     logic                      rst_n;
     
     // AXI-Stream interface
-    logic   [TID_W-1:0]             s_tid_i;    
-    logic   [TDEST_W-1:0]           s_tdest_i;
-    logic   [TDATA_W-1:0]           s_tdata_i;
-    logic   [TKEEP_W-1:0]           s_tkeep_i;
-    logic   [TSTRB_W-1:0]           s_tstrb_i;
-    logic                           s_tlast_i;
-    logic                           s_tvalid_i;
-    logic                           s_tready_o;
-    logic  [MST_ID_W-1:0]      s_awid_i;
-    logic  [ADDR_W-1:0]        s_awaddr_i;
-    logic  [TRANS_DATA_LEN_W-1:0]  s_awlen_i;
-    logic                      s_awvalid_i;
-    logic  [s_DATA_W-1:0]     s_wdata_i;
-    logic                      s_wlast_i;
-    logic                      s_wvalid_i;
-    logic                      s_bready_i;
-    logic  [MST_ID_W-1:0]      s_arid_i;
-    logic  [ADDR_W-1:0]        s_araddr_i;
-    logic                      s_arvalid_i;
-    logic  [TRANS_DATA_LEN_W-1:0]  s_arlen_i;
-    logic                      s_rready_i;
+    logic   [TID_W-1:0]         s_tid_i;    
+    logic   [TDEST_W-1:0]       s_tdest_i;
+    logic   [TDATA_W-1:0]       s_tdata_i;
+    logic   [TKEEP_W-1:0]       s_tkeep_i;
+    logic   [TSTRB_W-1:0]       s_tstrb_i;
+    logic                       s_tlast_i;
+    logic                       s_tvalid_i;
+    logic                       s_tready_o;
+    logic  [ATX_ID_W-1:0]       s_awid_i;
+    logic  [ATX_ADDR_W-1:0]     s_awaddr_i;
+    logic  [ATX_LEN_W-1:0]      s_awlen_i;
+    logic   [1:0]               s_awburst_i;
+    logic                       s_awvalid_i;
+    logic  [ATX_DATA_W-1:0]     s_wdata_i;
+    logic                       s_wlast_i;
+    logic                       s_wvalid_i;
+    logic                       s_bready_i;
+    logic  [ATX_ID_W-1:0]       s_arid_i;
+    logic  [ATX_ADDR_W-1:0]     s_araddr_i;
+    logic                       s_arvalid_i;
+    logic  [ATX_LEN_W-1:0]      s_arlen_i;
+    logic   [1:0]               s_arburst_i;
+    logic                       s_rready_i;
 
-    logic                      s_awready_o;
-    logic                      s_wready_o;
-    logic  [MST_ID_W-1:0]      s_bid_o;
-    logic  [TRANS_RESP_W-1:0]  s_bresp_o;
-    logic                      s_bvalid_o;
-    logic                      s_arready_o;
-    logic  [MST_ID_W-1:0]      s_rid_o;
-    logic  [s_DATA_W-1:0]     s_rdata_o;
-    logic  [TRANS_RESP_W-1:0]  s_rresp_o;
-    logic                      s_rlast_o;
-    logic                      s_rvalid_o;
-    logic                      dbi_dcx_o;
-    logic                      dbi_csx_o;
-    logic                      dbi_resx_o;
-    logic                      dbi_rdx_o;
-    logic                      dbi_wrx_o;
-    wire  [DBI_IF_D_W-1:0]     dbi_d_o;
+    logic                       s_awready_o;
+    logic                       s_wready_o;
+    logic  [ATX_ID_W-1:0]       s_bid_o;
+    logic  [ATX_RESP_W-1:0]     s_bresp_o;
+    logic                       s_bvalid_o;
+    logic                       s_arready_o;
+    logic  [ATX_ID_W-1:0]       s_rid_o;
+    logic  [ATX_DATA_W-1:0]     s_rdata_o;
+    logic  [ATX_RESP_W-1:0]     s_rresp_o;
+    logic                       s_rlast_o;
+    logic                       s_rvalid_o;
+    logic                       dbi_dcx_o;
+    logic                       dbi_csx_o;
+    logic                       dbi_resx_o;
+    logic                       dbi_rdx_o;
+    logic                       dbi_wrx_o;
+    wire  [DBI_IF_D_W-1:0]      dbi_d_o;
 
     dbi_tx_controller #(
         .INTERNAL_CLK   (INTERNAL_CLK),
@@ -91,7 +93,7 @@ module dbi_tx_controller_tb;
         .IN_PXL_TYPE    (IN_PXL_TYPE),
         .OUT_PXL_TYPE   (OUT_PXL_TYPE),
         .FRM_COL_NUM    (FRM_COL_NUM),
-        .FRM_ROW_NUM    (FRM_ROW_NUM),
+        .FRM_ROW_NUM    (FRM_ROW_NUM)
     ) dut (
         .*
     );
@@ -125,33 +127,38 @@ module dbi_tx_controller_tb;
     initial begin
         forever #(`DUT_CLK_PERIOD/2) clk <= ~clk;
     end
-
+    initial begin
+        #(`END_TIME);
+        $finish;
+    end
     initial begin   // Configure register
         #(`RST_DLY_START + `RST_DUR + 1);
         fork 
             begin   : AW_chn
-                s_aw_transfer(.s_awid(5'h00), .s_awaddr(32'h3000_0001), .s_awlen(8'h00));   // 1st
-                s_aw_transfer(.s_awid(5'h01), .s_awaddr(32'h3100_0000), .s_awlen(8'h04));   // 2nd
-                s_aw_transfer(.s_awid(5'h02), .s_awaddr(32'h3100_0001), .s_awlen(8'h03));   // 3rd
-                s_aw_transfer(.s_awid(5'h03), .s_awaddr(32'h3100_0002), .s_awlen(8'h06));   // 4th
+                s_aw_transfer(.s_awid(5'h00), .s_awaddr(32'h1000_0001), .s_awburst(2'b01), .s_awlen(8'h02));   // 1st
+                s_aw_transfer(.s_awid(5'h01), .s_awaddr(32'h1000_0010), .s_awburst(2'b00), .s_awlen(8'h04));   // 2nd
+                s_aw_transfer(.s_awid(5'h02), .s_awaddr(32'h1000_0011), .s_awburst(2'b00), .s_awlen(8'h03));   // 3rd
+                s_aw_transfer(.s_awid(5'h03), .s_awaddr(32'h1000_0012), .s_awburst(2'b00), .s_awlen(8'h06));   // 4th
                 aclk_cl;
                 s_awvalid_i <= 1'b0;
 
                 repeat(20) aclk_cl;
 
-                s_aw_transfer(.s_awid(5'h00), .s_awaddr(32'h3000_0000), .s_awlen(8'h00));   // 5th
+                s_aw_transfer(.s_awid(5'h00), .s_awaddr(32'h1000_0000), .s_awburst(2'b01), .s_awlen(8'h00));   // 5th
                 aclk_cl;
                 s_awvalid_i <= 1'b0;
 
                 repeat(2_200_000) aclk_cl;
 
-                s_aw_transfer(.s_awid(5'h00), .s_awaddr(32'h3000_0000), .s_awlen(8'h00));   // 6th
+                s_aw_transfer(.s_awid(5'h00), .s_awaddr(32'h1000_0000), .s_awburst(2'b01), .s_awlen(8'h00));   // 6th
                 aclk_cl;
                 s_awvalid_i <= 1'b0;
             end
             begin   : W_chn
                 // 1st
-                s_w_transfer(.s_wdata(8'h2C), .s_wlast(1'b1));
+                s_w_transfer(.s_wdata(32'h2C), .s_wlast(1'b0));  // MEM_COM
+                s_w_transfer(.s_wdata(32'd320), .s_wlast(1'b0)); // FRM_WIDTH 
+                s_w_transfer(.s_wdata(32'd240), .s_wlast(1'b1)); // FRM_HEIGHT
                 // 2nd
                 s_w_transfer(.s_wdata(8'b0000_0010), .s_wlast(1'b0));    // HW_RST
                 s_w_transfer(.s_wdata(8'b0001_0000), .s_wlast(1'b0));    // 1 CMD - 4 DAT
@@ -174,7 +181,7 @@ module dbi_tx_controller_tb;
                 // 5th
                 s_w_transfer(.s_wdata(8'b0000_0001), .s_wlast(1'b1));    // Turn into CONF mode
                 // 6th
-                s_w_transfer(.s_wdata(8'b0000_0010), .s_wlast(1'b1));    // Turn into CONF mode
+                s_w_transfer(.s_wdata(8'b0000_0010), .s_wlast(1'b1));    // Turn into STREAM mode
                 aclk_cl;
                 s_wvalid_i <= 1'b0;
             end
@@ -182,7 +189,7 @@ module dbi_tx_controller_tb;
                 repeat(20) begin
                     aclk_cl;
                 end
-                s_ar_transfer(.s_arid(5'h00), .s_araddr(32'h3100_0000), .s_arlen(8'h02));
+                s_ar_transfer(.s_arid(5'h00), .s_araddr(32'h1000_0010), .s_arburst(2'b01), .s_arlen(8'h02));
                 aclk_cl;
                 s_arvalid_i <= 1'b0;
             end
@@ -192,12 +199,12 @@ module dbi_tx_controller_tb;
         localparam TX_PER_TXN = 2400;
         int tx_cnt;
         int byte_cnt;
-        bit [DMA_DATA_W-1:0] dma_wdata;
+        bit [TDATA_W-1:0] dma_wdata;
         #(`RST_DLY_START + `RST_DUR + 1);
         fork
             begin : DMA_W
                 for (tx_cnt=0; tx_cnt < TX_PER_TXN; tx_cnt++) begin
-                    for (byte_cnt = 0; byte_cnt < (DMA_DATA_W/8); byte_cnt++) begin
+                    for (byte_cnt = 0; byte_cnt < (TDATA_W/8); byte_cnt++) begin
                         dma_wdata[8*(byte_cnt+1)-1-:8] = (byte_cnt%2 == 0) ? '1 : '0;
                     end
                     axis_transfer(.s_tdest(TDEST_MASK), .s_tdata(dma_wdata), .s_tlast((tx_cnt==(TX_PER_TXN-1))));
@@ -212,11 +219,13 @@ module dbi_tx_controller_tb;
     task automatic s_aw_transfer(
         input [ATX_ID_W-1:0]    s_awid,
         input [ATX_ADDR_W-1:0]  s_awaddr,
+        input [1:0]             s_awburst,
         input [ATX_LEN_W-1:0]   s_awlen
     );
         aclk_cl;
         s_awid_i            <= s_awid;
         s_awaddr_i          <= s_awaddr;
+        s_awburst_i         <= s_awburst;
         s_awlen_i           <= s_awlen;
         s_awvalid_i         <= 1'b1;
         // Handshake occur
@@ -236,11 +245,13 @@ module dbi_tx_controller_tb;
     task automatic s_ar_transfer(
         input [ATX_ID_W-1:0]    s_arid,
         input [ATX_ADDR_W-1:0]  s_araddr,
+        input [1:0]             s_arburst,
         input [ATX_LEN_W-1:0]   s_arlen
     );
         aclk_cl;
         s_arid_i            <= s_arid;
         s_araddr_i          <= s_araddr;
+        s_arburst_i         <= s_arburst;
         s_arlen_i           <= s_arlen;
         s_arvalid_i         <= 1'b1;
         // Handshake occur

@@ -238,7 +238,8 @@ module dbi_tx_controller
     // -- State Machine 
     dtc_state_machine #(
         .INTERNAL_CLK       (INTERNAL_CLK),
-        .DBI_IF_D_W         (DBI_IF_D_W)
+        .DBI_IF_D_W         (DBI_IF_D_W),
+        .FRM_DIM_W          (FRM_DIM_W)
     ) sm (
         .clk                (clk),
         .rst_n              (rst_n),

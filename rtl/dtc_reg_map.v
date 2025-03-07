@@ -107,8 +107,8 @@ module dtc_reg_map #(
         .TRANS_DATA_SIZE_W  (ATX_SIZE_W),
         .TRANS_RESP_W       (ATX_RESP_W)
     ) ac (
-        .clk                (clk),
-        .rst_n              (rst_n),
+        .clk                (aclk),
+        .rst_n              (aresetn),
         .m_awid_i           (s_awid_i),
         .m_awaddr_i         (s_awaddr_i),
         .m_awburst_i        (s_awburst_i),
