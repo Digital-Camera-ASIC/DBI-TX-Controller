@@ -21,6 +21,7 @@ if(PROC_PXL_W > DBI_IF_D_W) begin : ALIGN_GEN
         .DATA_WIDTH     (),      // Don't care
         .IN_DATA_WIDTH  (PROC_PXL_W),
         .OUT_DATA_WIDTH (DBI_IF_D_W),
+        .DECONCAT_ORDER ("MSB"), // First half of a RGB565 pixel is the upper 8-bit (MSB) -> According to MIPI DBI spec 
         .FIFO_DEPTH     ()       // Don't care
     ) downsizer (   
         .clk            (clk),
