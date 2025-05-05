@@ -1,0 +1,13 @@
+./../rtl/dbi_tx_controller.v
+./../rtl/dtc_axis_pxl.v
+./../rtl/dtc_dbi_aligner.v
+./../rtl/dtc_phy_ctrl.v
+./../rtl/dtc_pxl_adapter.v
+./../rtl/dtc_reg_map.v
+./../rtl/dtc_state_machine.v
+./../rtl/common/adapter/axi/axi4_ctrl.v
+./../rtl/common/encoder/onehot_encoder/onehot_encoder.v
+./../rtl/common/fifo/sync_fifo/fifo.v
+./../rtl/common/fifo/sync_fifo/sync_fifo.v
+./../rtl/common/skid_buffer/sb_fifo.v
+./../rtl/common/skid_buffer/skid_buffer.v
